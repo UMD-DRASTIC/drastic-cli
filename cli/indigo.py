@@ -28,12 +28,22 @@ Usage:
   indigo mkdir <path>
   indigo put <src> [<dest>] [--mimetype=<MIME>]
   indigo get <src> [<dest>] [--force]
-  indigo rm <path> [--recursive]
+  indigo rm <path>
   indigo meta add <path> <meta_name> <meta_value>
   indigo meta set <path> <meta_name> <meta_value>
   indigo meta rm <path> <meta_name> [<meta_value>]
   indigo meta ls <path> [<meta_name>]
-  
+  indigo admin lu [<name>]
+  indigo admin lg [<name>]
+  indigo admin mkuser [<name>]
+  indigo admin moduser <name> (email | administrator | active | password) [<value>]
+  indigo admin rmuser [<name>]
+  indigo admin mkgroup [<name>] [<owner>]
+  indigo admin rmgroup [<name>]
+  indigo admin atg <name> <user> ...
+  indigo admin rtg <name> <user> ...
+
+
   indigo (-h | --help)
   indigo --version
 
@@ -44,65 +54,246 @@ Options:
 
 """
 
+# TODO: Modify group ? If we remove owner there's nothing left to modify
+
 
 from docopt import docopt
 from blessings import Terminal
 import os
 import pickle
-import urllib2
 from getpass import getpass
 from operator import methodcaller
 import errno
-from collections import defaultdict
 
 import cli
 from cli.client import IndigoClient
-from cli.errors import (
-    HTTPError,
-    IndigoClientError,
-    IndigoConnectionError,
-    NoSuchObjectError,
-    ObjectConflictError
-)
 
 SESSION_PATH = os.path.join(os.path.expanduser('~/.indigo'),
                             'session.pickle'
                             )
 
+
 class IndigoApplication(object):
+    """Methods for the CLI"""
 
     def __init__(self, session_path):
         self.terminal = Terminal()
         self.session_path = session_path
 
+    def admin_lg(self, args):
+        """List all groups or a specific group if the name is specified"""
+        client = self.get_client(args)
+        name = args['<name>']
+        if name:
+            res = client.list_group(name)
+            if not res.ok():
+                self.print_error(res.msg())
+                return res.code()
+            group_info = res.json()
+            members = ", ".join(group_info.get("members", []))
+            print "{0.bold}Group name{0.normal}: {1}".format(
+                self.terminal,
+                group_info.get("name", name))
+            print "{0.bold}Group id{0.normal}: {1}".format(
+                self.terminal,
+                group_info.get("id", ""))
+            print "{0.bold}Members{0.normal}: {1}".format(
+                self.terminal,
+                members)
+        else:
+            res = client.list_groups()
+            if not res.ok():
+                self.print_error(res.msg())
+                return res.code()
+            for groupname in res.msg():
+                print groupname
+
+    def admin_lu(self, args):
+        """List all users or a specific user if the name is specified"""
+        client = self.get_client(args)
+        name = args['<name>']
+        if name:
+            res = client.list_user(name)
+            if not res.ok():
+                self.print_error(res.msg())
+                return res.code()
+            user_info = res.json()
+            groups = ", ".join([el['name']
+                                for el in user_info.get("groups", [])])
+            print "{0.bold}User name{0.normal}: {1}".format(
+                self.terminal,
+                user_info.get("username", name))
+            print "{0.bold}Email{0.normal}: {1}".format(
+                self.terminal,
+                user_info.get("email", ""))
+            print "{0.bold}User id{0.normal}: {1}".format(
+                self.terminal,
+                user_info.get("id", ""))
+            print "{0.bold}Administrator{0.normal}: {1}".format(
+                self.terminal,
+                user_info.get("administrator", False))
+            print "{0.bold}Active{0.normal}: {1}".format(
+                self.terminal,
+                user_info.get("active", False))
+            print "{0.bold}Groups{0.normal}: {1}".format(
+                self.terminal,
+                groups)
+        else:
+            res = client.list_users()
+            if not res.ok():
+                self.print_error(res.msg())
+                return res.code()
+            for username in res.msg():
+                print username
+
+    def admin_mkgroup(self, args):
+        """Create a new group. Ask in the terminal for mandatory fields"""
+        client = self.get_client(args)
+        if not args['<name>']:
+            groupname = raw_input("Please enter the group name: ")
+        else:
+            groupname = args['<name>']
+        res = client.list_group(groupname)
+        if res.ok():
+            self.print_error("Groupname {} already exists".format(groupname))
+            return 409          # Conflict
+        res = client.create_group(groupname, args['<owner>'])
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
+    def admin_mkuser(self, args):
+        """Create a new user. Ask in the terminal for mandatory fields"""
+        client = self.get_client(args)
+        if not args['<name>']:
+            username = raw_input("Please enter the user's username: ")
+        else:
+            username = args['<name>']
+        res = client.list_user(username)
+        if res.ok():
+            self.print_error("Username {} already exists".format(username))
+            return 409          # Conflict
+        admin = raw_input("Is this an administrator? [y/N] ")
+        email = ""
+        while not email:
+            email = raw_input("Please enter the user's email address: ")
+        password = ""
+        while not password:
+            password = getpass("Please enter the user's password: ")
+        res = client.create_user(username,
+                                 email,
+                                 admin.lower() == 'y',
+                                 password)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
+    def admin_moduser(self, args):
+        """Moduser a new user. Ask in the terminal if the value isn't
+        provided"""
+        client = self.get_client(args)
+        value = args['<value>']
+        if not value:
+            while not value:
+                value = raw_input("Please enter the new value: ")
+            while not value:
+                value = getpass("Please enter the new password: ")
+        d = {}
+        if args['email']:
+            d['email'] = value
+        elif args['administrator']:
+            d['administrator'] = value.lower() in ["true", "y", "yes"]
+        elif args['active']:
+            d['active'] = value.lower() in ["true", "y", "yes"]
+        elif args['password']:
+            d['password'] = value
+        res = client.mod_user(args['<name>'], d)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
+    def admin_rmgroup(self, args):
+        """Remove a group."""
+        client = self.get_client(args)
+        if not args['<name>']:
+            groupname = raw_input("Please enter the group name: ")
+        else:
+            groupname = args['<name>']
+        res = client.rm_group(groupname)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
+    def admin_rmuser(self, args):
+        """Remove a user."""
+        client = self.get_client(args)
+        if not args['<name>']:
+            username = raw_input("Please enter the user's username: ")
+        else:
+            username = args['<name>']
+        res = client.rm_user(username)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
+    def admin_atg(self, args):
+        """Add user(s) to a group."""
+        client = self.get_client(args)
+        groupname = args['<name>']
+        ls_user = args['<user>']
+        res = client.add_user_group(groupname, ls_user)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
+    def admin_rtg(self, args):
+        """Remove user(s) to a group."""
+        client = self.get_client(args)
+        groupname = args['<name>']
+        ls_user = args['<user>']
+        res = client.rm_user_group(groupname, ls_user)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
 
     def cd(self, args):
         "Move into a different container."
         client = self.get_client(args)
         path = args['<path>']
-        try:
-            client.chdir(path)
-        except NoSuchObjectError as e:
-            print ("cd: {0}: No such object or container"
-                   "".format(path))
-            return e.errno
-        # Save the client for future use
-        self.save_client(client)
-
+        res = client.chdir(path)
+        if res.ok():
+            # Save the client for future use
+            self.save_client(client)
+        else:
+            self.print_error(res.msg())
 
     def create_client(self, args):
         """Return a IndigoClient."""
         url = args['--url']
         client = IndigoClient(url)
         # Test for client connection errors here
-        try:
-            json = client.get_cdmi('/')
-        except HTTPError as e:
-            if e.code in [401, 403]:
-                # Allow for authentication to take place later
-                return client
-            raise e
-        return client
+        res = client.get_cdmi('/')
+        if res.code() in [0, 401, 403]:
+            # 0 means success
+            # 401/403 means authentication problem, we allow for authentication
+            # to take place later
+            return client
+        else:
+            self.print_error(res.msg())
 
     def exit(self, args):
         "Close CDMI client session"
@@ -112,49 +303,45 @@ class IndigoApplication(object):
             # No saved client to log out
             pass
 
-
     def get(self, args):
         "Fetch a data object from the archive to a local file."
+        src = args['<src>']
+        dest = args['<dest>']
         # Determine local filename
-        if args['<dest>']:
-            localpath = args['<dest>']
+        if dest:
+            localpath = dest
         else:
-            localpath = args['<src>'].rsplit('/')[-1]
-    
+            localpath = src.rsplit('/')[-1]
+
         # Check for overwrite of existing file, directory, link
         if os.path.isfile(localpath):
             if not args['--force']:
-                print ("get: {0}: "
-                       "File exists, --force option not used"
-                       "".format(localpath)
-                       )
+                self.print_error(
+                    "File '{0}' exists, --force option not used"
+                    "".format(localpath))
                 return errno.EEXIST
         elif os.path.isdir(localpath):
-            print ("get: {0}: "
-                   "Is a directory"
-                   "".format(localpath))
+            self.print_error("'{0}' is a directory".format(localpath))
             return errno.EISDIR
         elif os.path.exists(localpath):
-            print ("get: {0}: "
-                   "Exists but not a file"
-                   "".format(localpath))
+            self.print_error("'{0}'exists but not a file".format(localpath))
             return errno.EEXIST
-    
-        client = self.get_client(args)
-        try:
-            with client.open(args['<src>']) as cfh, open(localpath, 'wb') as lfh:
-                lfh.write(cfh.text)
-        except NoSuchObjectError as e:
-            print ("get: {0}: No such object or container"
-                   "".format(args.path))
-            return e.code
-        else:
-            print(localpath)
 
+        client = self.get_client(args)
+        cfh = client.open(src)
+        if cfh.status_code == 404:
+            self.print_error("'{0}': No such object or container"
+                             "".format(src))
+            return 404
+        lfh = open(localpath, 'wb')
+        for chunk in cfh.iter_content(8192):
+            lfh.write(chunk)
+        lfh.close()
+        print localpath
 
     def get_client(self, args):
         """Return a IndigoClient.
-    
+
         This may be achieved by loading a IndigoClient with a previously saved
         session.
         """
@@ -171,57 +358,62 @@ class IndigoApplication(object):
             client = self.create_client(args)
         return client
 
-
     def init(self, args):
         """Initialize a CDMI client session.
-    
+
         Optionally log in using HTTP Basic username and password credentials.
         """
         client = self.get_client(args)
-        if args['--username']:
-            if not args['--password']:
+        username = args['--username']
+        password = args['--password']
+        if username:
+            if not password:
                 # Request password from interactive prompt
-                args['--password'] = getpass("Password: ")
-    
-            success = client.authenticate(args['--username'], args['--password'])
-            if success:
-                print('Successfully logged in as {0.bold}{1}{0.normal}'
-                      ''.format(self.terminal, args['--username'])
-                      )
+                password = getpass("Password: ")
+
+            res = client.authenticate(username, password)
+            if res.ok():
+                print ("{0.bold_green}Success{0.normal} - {1} as "
+                       "{0.bold}{2}{0.normal}".format(self.terminal,
+                                                      res.msg(),
+                                                      username))
             else:
+                print "{0.bold_red}Failed{0.normal} - {1}".format(
+                    self.terminal,
+                    res.msg())
                 # Failed to log in
                 # Exit without saving client
-                print('{0.bold_red}Failed{0.normal} - Login credentials not '
-                      'recognized'.format(self.terminal)
-                      )
-                return 401
-        print self.terminal.green("Connected")
+                return res.code()
+        else:
+            print ("{0.bold_green}Connected{0.normal} -"
+                   " Anonymous access".format(self.terminal))
         # Save the client for future use
         self.save_client(client)
         return 0
 
-
     def ls(self, args):
-        """List a container or object."""
+        """List a container."""
         client = self.get_client(args)
         path = args['<path>']
-        try:
-            cdmi_info = client.ls(path)
-        except (NoSuchObjectError) as e:
-            print ("ls: cannot access {0}: No such container"
-                   "".format(path))
-            return 404
-        if cdmi_info[u'objectType'] == u'application/cdmi-container':
-            containers = [x for x in cdmi_info[u'children'] if x.endswith('/')]
-            objects = [x for x in cdmi_info[u'children'] if not x.endswith('/')]
-            for child in sorted(containers, key=methodcaller('lower')):
-                print self.terminal.blue(child)
-            for child in sorted(objects, key=methodcaller('lower')):
-                print child
+        res = client.ls(path)
+        if res.ok():
+            cdmi_info = res.json()
+            if cdmi_info[u'objectType'] == u'application/cdmi-container':
+                containers = [x
+                              for x in cdmi_info[u'children']
+                              if x.endswith('/')]
+                objects = [x
+                           for x in cdmi_info[u'children']
+                           if not x.endswith('/')]
+                for child in sorted(containers, key=methodcaller('lower')):
+                    print self.terminal.blue(child)
+                for child in sorted(objects, key=methodcaller('lower')):
+                    print child
+            else:
+                print cdmi_info[u'objectName']
+            return 0
         else:
-            print cdmi_info[u'objectName']
-        return 0
-
+            self.print_error(res.msg())
 
     def meta_add(self, args, replace=False):
         """Add metadata"""
@@ -229,13 +421,15 @@ class IndigoApplication(object):
         path = args['<path>']
         if path == '.' or path == './':
             path = client.pwd()
-        cdmi_info = client.get_cdmi(path)
+        res = client.get_cdmi(path)
+        if not res.ok():
+            self.print_error(res.msg())
+            return res.code()
+        cdmi_info = res.json()
         metadata = cdmi_info['metadata']
-        
         attr = args['<meta_name>']
         val = args['<meta_value>']
-
-        if metadata.has_key(attr):
+        if attr in metadata:
             if replace:
                 metadata[attr] = val
             else:
@@ -247,9 +441,10 @@ class IndigoApplication(object):
                     metadata[attr] = [metadata[attr], val]
         else:
             metadata[attr] = val
-
-        cdmi_info = client.put(path, metadata=metadata)
-
+        res = client.put(path, metadata=metadata)
+        if not res.ok():
+            self.print_error(res.msg())
+            return res.code()
 
     def meta_ls(self, args):
         """List metadata"""
@@ -257,25 +452,29 @@ class IndigoApplication(object):
         path = args['<path>']
         if path == '.' or path == './':
             path = client.pwd()
-        cdmi_info = client.get_cdmi(path)
-        
+        res = client.get_cdmi(path)
+        if not res.ok():
+            self.print_error(res.msg())
+            return res.code()
+        cdmi_info = res.json()
         if args['<meta_name>']:
             # List 1 field
-            if cdmi_info['metadata'].has_key(args['<meta_name>']):
-                print('{0}:{1}'.format(args['<meta_name>'],
-                                       cdmi_info['metadata'][args['<meta_name>']]))
+            if args['<meta_name>'] in cdmi_info['metadata']:
+                print('{0}:{1}'.format(
+                    args['<meta_name>'],
+                    cdmi_info['metadata'][args['<meta_name>']]))
         else:
             # List everything
             for attr, val in cdmi_info['metadata'].iteritems():
-                if attr.startswith(('cdmi_', 'com.archiveanalytics.indigo_')):
+                if attr.startswith(('cdmi_',
+                                    'com.archiveanalytics.indigo_')):
                     # Ignore non-user defined metadata
                     continue
                 if isinstance(val, list):
                     for v in val:
-                        print('{0}:{1}'.format(attr, v))
+                        print '{0}:{1}'.format(attr, v)
                 else:
-                    print('{0}:{1}'.format(attr, val))
-
+                    print '{0}:{1}'.format(attr, val)
 
     def meta_rm(self, args):
         """Remove metadata"""
@@ -283,30 +482,34 @@ class IndigoApplication(object):
         path = args['<path>']
         if path == '.' or path == './':
             path = client.pwd()
-        cdmi_info = client.get_cdmi(path)
+        res = client.get_cdmi(path)
+        if not res.ok():
+            self.print_error(res.msg())
+            return res.code()
+        cdmi_info = res.json()
         metadata = cdmi_info['metadata']
-        
         attr = args['<meta_name>']
         val = args['<meta_value>']
-
         if val:
             # Remove a specific value
-             ex_val = metadata[attr]
-             if isinstance(ex_val, list):
-                 # Remove all elements of teh list with value val
-                 metadata[attr] = [x for x in ex_val if x != val]
-             elif ex_val == val:
-                 # Remove a single element if that's the one we wanted to remove
-                 del metadata[attr]
+            ex_val = metadata[attr]
+            if isinstance(ex_val, list):
+                # Remove all elements of teh list with value val
+                metadata[attr] = [x for x in ex_val if x != val]
+            elif ex_val == val:
+                # Remove a single element if that's the one we wanted to
+                # remove
+                del metadata[attr]
         else:
             try:
                 del metadata[attr]
             except KeyError:
                 # Metadata not defined
                 pass
-
-        cdmi_info = client.put(path, metadata=metadata)
-
+        res = client.put(path, metadata=metadata)
+        if not res.ok():
+            self.print_error(res.msg())
+            return res.code()
 
     def mkdir(self, args):
         "Create a new container."
@@ -315,92 +518,76 @@ class IndigoApplication(object):
         if not path.startswith("/"):
             # relative path
             path = "{}{}".format(client.pwd(), path)
-        try:
-            client.mkdir(path)
-        except NoSuchResourceError as e:
-            print ("mkdir: cannot create container '{0}': "
-                   "No such object or container"
-                   "".format(path))
-            return e.errno
-        except (NoSuchCollectionError, ResourceConflictError) as e:
-            print ("mkdir: cannot create container '{0}': "
-                   "Not a container"
-                   "".format(path))
-            return e.errno
-        except CollectionConflictError as e:
-            print ("mkdir: cannot create container '{0}': "
-                   "Container exists"
-                   "".format(path))
-            return e.errno
+        res = client.mkdir(path)
+        if not res.ok():
+            self.print_error(res.msg())
 
+    def print_error(self, msg):
+        """Display an error message."""
+        print "{0.bold_red}Error{0.normal} - {1}".format(self.terminal,
+                                                         msg)
+
+    def print_success(self, msg):
+        """Display a success message."""
+        print "{0.bold_green}Success{0.normal} - {1}".format(self.terminal,
+                                                             msg)
+
+    def print_warning(self, msg):
+        """Display a warning message."""
+        print "{0.bold_blue}Warning{0.normal} - {1}".format(self.terminal, msg)
 
     def put(self, args):
         "Put a file to a path."
+        src = args['<src>']
         # Absolutize local path
-        localpath = os.path.abspath(args['<src>'])
-        try:
-            with open(localpath, 'rb') as fh:
-                client = self.get_client(args)
-                if args['<dest>']:
-                    path = args['<dest>']
-                else:
-                    # PUT to same name in pwd on server
-                    path = os.path.basename(localpath)
-    
-                try:
-                    # To avoid reading large files into memory, client.put()
-                    # accepts file-like objects
-                    cdmi_info = client.put(path, fh, mimetype=args["--mimetype"])
-                except NoSuchResourceError as e:
-                    print ("put: cannot put data '{0}': "
-                           "No such object or container"
-                           "".format(path))
-                    return e.errno
-                print(cdmi_info[u'parentURI'] + cdmi_info[u'objectName'])
-    
-        except IOError as e:
-            print ("put: local file {0}: "
-                   "No such file or directory"
-                   "".format(args['<src>'])
-                   )
-            return e.errno
-
+        local_path = os.path.abspath(src)
+        if args['<dest>']:
+            dest = args['<dest>']
+        else:
+            # PUT to same name in pwd on server
+            dest = os.path.basename(local_path)
+        if not os.path.exists(local_path):
+            self.print_error("File '{}' doesn't exist".format(local_path))
+            return errno.ENOENT
+        with open(local_path, 'rb') as fh:
+            client = self.get_client(args)
+            # To avoid reading large files into memory,
+            # client.put() accepts file-like objects
+            res = client.put(dest, fh, mimetype=args["--mimetype"])
+            if res.ok():
+                cdmi_info = res.json()
+                print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
+            else:
+                self.print_error(res.msg())
 
     def pwd(self, args):
         """Print working directory"""
         client = self.get_client(args)
         print client.pwd()
 
-
     def rm(self, args):
-        "Remove a data object."
-        # Check for container without recursive
+        """Remove a data object or a collection.
+
+        If we forget the trailing '/' for a collection we try to add it.
+        """
         path = args['<path>']
-        if path.endswith('/') and not args['--recursive']:
-            print ("rm: cannot remove '{0}': "
-                   "Is a container"
-                   "".format(path))
-            return errno.EISDIR
-    
         client = self.get_client(args)
-        try:
-            client.delete(path)
-        except NoSuchObjectException:
-            # Possibly a container given without the trailing
+        res = client.delete(path)
+        if res.code() == 404:
+            # Possibly a container given withouttrailing
             # Try fetching in order to give correct response
-            try:
-                cdmi_info = client.get_cdmi(path + "/")
-            except NoSuchObjectException as e:
+            res = client.get_cdmi(path + "/")
+            if not res.ok():
                 # It really does not exist!
-                print ("rm: cannot remove '{0}': "
-                       "No such object or container"
-                       "".format(path)
-                       )
-                return e.errno
-    
-            # Fixup path and recursively call this function (_rm)
-            arg['<path>'] = cdmi_info['parentURI'] + cdmi_info['objectName']
-            return _rm(args)
+                self.print_error(("Cannot remove '{0}': "
+                                  "No such object or container)"
+                                  "".format(path)))
+                return 404
+            cdmi_info = res.json()
+            # Fixup path and recursively call this function (rm)
+            args['<path>'] = "{}{}".format(cdmi_info['parentURI'],
+                                           cdmi_info['objectName'])
+            return self.rm(args)
 
     def save_client(self, client):
         """Save the status of the IndigoClient for subsequent use."""
@@ -412,12 +599,14 @@ class IndigoApplication(object):
 
 
 def main():
+    """Main function"""
     arguments = docopt(__doc_opt__,
                        version='Indigo CLI {}'.format(cli.__version__))
     app = IndigoApplication(SESSION_PATH)
 
     if arguments['init']:
         return app.init(arguments)
+
     elif arguments['meta']:
         if arguments['add']:
             return app.meta_add(arguments)
@@ -427,6 +616,27 @@ def main():
             return app.meta_ls(arguments)
         elif arguments['rm']:
             return app.meta_rm(arguments)
+
+    elif arguments['admin']:
+        if arguments['lu']:
+            return app.admin_lu(arguments)
+        if arguments['lg']:
+            return app.admin_lg(arguments)
+        if arguments['mkuser']:
+            return app.admin_mkuser(arguments)
+        if arguments['moduser']:
+            return app.admin_moduser(arguments)
+        if arguments['rmuser']:
+            return app.admin_rmuser(arguments)
+        if arguments['mkgroup']:
+            return app.admin_mkgroup(arguments)
+        if arguments['rmgroup']:
+            return app.admin_rmgroup(arguments)
+        if arguments['atg']:
+            return app.admin_atg(arguments)
+        if arguments['rtg']:
+            return app.admin_rtg(arguments)
+
     elif arguments['exit']:
         return app.exit(arguments)
     elif arguments['pwd']:
@@ -443,7 +653,6 @@ def main():
         return app.get(arguments)
     elif arguments['rm']:
         return app.rm(arguments)
-
 
 
 if __name__ == '__main__':

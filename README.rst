@@ -5,16 +5,24 @@ Indigo Command Line Interface
 Description
 -----------
 
-A Python client and command-line tool for the Indigo digital archive. Also
-includes a rudimentary client for any CDMI enabled cloud storage.
+A Python client and command-line tool for the Indigo digital archive. Includes 
+a rudimentary client for any CDMI enabled cloud storage.
 
 After Installation_, connect to an Indigo archive::
 
-    indigo init --api=https://indigo.example.com/api/cdmi
+    indigo init --url=http://indigo.example.com
 
 (or if authentication is required by the archive)::
 
-    indigo init --api=https://indigo.example.com/api/cdmi --username=USER --password=PASS
+    indigo init --url=http://indigo.example.com --username=USER --password=PASS
+
+(if you don't want to pass the password in the command line it will be asked if
+you don't provide the --password option)
+    indigo init --url=http://indigo.example.com --username=USER
+
+Close the current session to prevent unauthorized access::
+
+    indigo exit
 
 Show current working container::
 
@@ -22,44 +30,40 @@ Show current working container::
 
 List a container::
 
-    indigo ls [name]
+    indigo ls <path>
 
 Move to a new container::
 
-    indigo cd subdir
+    indigo cd <path>
     ...
     indigo cd ..  # back up to parent
 
 Create a new container::
 
-    indigo mkdir new
+    indigo mkdir <path>
 
-Put a local file::
+Put a local file, with eventually a new name::
 
-    indigo put source.txt
+    indigo put <src>
     ...
-    indigo put source.txt destination.txt  # Put to a different name remotely
+    indigo put <src> <dst>
 
 Provide the MIME type of the object (if not supplied ``indigo put`` will attempt
 to guess)::
 
-     indigo put --mimetype="text/plain" source.txt
+     indigo put --mimetype="text/plain" <src>
 
 Fetch a data object from the archive to a local file::
 
-    indigo get source.txt
+    indigo get <src>
 
-    indigo get source.txt destination.txt  # Get with a different name locally
+    indigo get <src> <dst>
 
-    indigo get --force source.txt  # Overwrite an existing local file
+    indigo get --force <src> # Overwrite an existing local file
 
 Remove an object or a container::
 
-    indigo rm file.txt
-
-Close the current session to prevent unauthorized access::
-
-    indigo exit
+    indigo rm <src>
 
 
 Advanced Use - Metadata
@@ -67,28 +71,77 @@ Advanced Use - Metadata
 
 Set (overwrite) a metadata value for a field::
 
-    indigo meta set file.txt "org.dublincore.creator" "S M Body"
+    indigo meta set <path> "org.dublincore.creator" "S M Body"
     indigo meta set . "org.dublincore.title" "My Collection"
 
 Add another value to an existing metadata field::
 
-    indigo meta add file.txt "org.dublincore.creator" "A N Other"
+    indigo meta add <path> "org.dublincore.creator" "A N Other"
 
 List metadata values for all fields::
 
-    indigo meta ls file.txt
+    indigo meta ls <path>
 
 List metadata value(s) for a specific field::
 
-    indigo meta ls file.txt org.dublincore.creator
+    indigo meta ls <path> org.dublincore.creator
 
 Delete a metadata field::
 
-    indigo meta rm file.txt "org.dublincore.creator"
+    indigo meta rm <path> "org.dublincore.creator"
 
 Delete a specific metadata field with a value::
 
-    indigo meta rm file.txt "org.dublincore.creator" "A N Other"
+    indigo meta rm <path> "org.dublincore.creator" "A N Other"
+
+
+Advanced Use - Administration
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+List existing users::
+
+    indigo admin lu
+
+List information about a user::
+
+    indigo admin lu <name>
+
+List existing groups::
+
+    indigo admin lg
+
+List information about a group::
+
+    indigo admin lg <name>
+
+Create a user::
+
+    indigo admin mkuser [<name>]
+
+Modify a user::
+
+    indigo admin moduser <name> (email | administrator | active | password) [<value>]
+
+Remove a user::
+
+    indigo admin rmuser [<name>]
+
+Create a group::
+
+    indigo admin mkgroup [<name>] [<owner>]
+
+Remove a group::
+
+    indigo admin rmgroup [<name>]
+
+Add user(s) to a group::
+
+    indigo admin atg <name> <user> ...
+
+Remove user(s) from a group::
+
+    indigo admin rtg <name> <user> ...
+
 
 
 Installation

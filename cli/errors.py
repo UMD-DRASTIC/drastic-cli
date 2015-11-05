@@ -22,7 +22,7 @@ class IndigoClientError(Exception):
 
     Abstract Base Class from which more specific Exceptions are derived.
     """
-    
+
     def __init__(self, code, msg):
         self.code = code
         self.msg = msg
@@ -32,26 +32,27 @@ class IndigoClientError(Exception):
 
 
 class HTTPError(IndigoClientError):
+    """Indigo HTTP Exception."""
 
     def __str__(self):
         return "HTTP Error {}: {}".format(self.code, self.msg)
 
 
-class IndigoConnectionError(IOError, IndigoClientError):
+class IndigoConnectionError(IndigoClientError):
     """Indigo client connection Exception."""
 
     def __str__(self):
         return "Connection Error {}: {}".format(self.code, self.msg)
 
 
-class NoSuchObjectError(EnvironmentError, IndigoClientError):
+class NoSuchObjectError(IndigoClientError):
     """Indigo client no such object Exception."""
 
     def __str__(self):
         return "Object already exists at {0}".format(self.msg)
 
 
-class ObjectConflictError(EnvironmentError, IndigoClientError):
+class ObjectConflictError(IndigoClientError):
     """Indigo object already exists Exception."""
 
     def __str__(self):

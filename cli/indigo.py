@@ -38,7 +38,7 @@ Usage:
   indigo admin mkuser [<name>]
   indigo admin moduser <name> (email | administrator | active | password) [<value>]
   indigo admin rmuser [<name>]
-  indigo admin mkgroup [<name>] [<owner>]
+  indigo admin mkgroup [<name>]
   indigo admin rmgroup [<name>]
   indigo admin atg <name> <user> ...
   indigo admin rtg <name> <user> ...
@@ -53,8 +53,6 @@ Options:
   --url=<URL>   Location of Indigo server [default: http://127.0.0.1]
 
 """
-
-# TODO: Modify group ? If we remove owner there's nothing left to modify
 
 
 from docopt import docopt
@@ -157,7 +155,7 @@ class IndigoApplication(object):
         if res.ok():
             self.print_error("Groupname {} already exists".format(groupname))
             return 409          # Conflict
-        res = client.create_group(groupname, args['<owner>'])
+        res = client.create_group(groupname)
         if res.ok():
             self.print_success(res.msg())
         else:

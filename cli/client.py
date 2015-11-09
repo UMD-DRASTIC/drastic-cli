@@ -173,22 +173,15 @@ class IndigoClient(object):
         else:
             return Response(res.status_code, res)
 
-    def create_group(self, groupname, username=""):
+    def create_group(self, groupname):
         """Create a new group.
 
         :arg groupname: Name of the group to create
-        :arg username: Name of the owner of the group
         :returns: The status code of the Response
         :rtype: int
 
         """
-        if not username:
-            try:
-                username = self.auth[0]
-            except TypeError:
-                return Response(400, "Missing owner name")
-        data = {"groupname": groupname,
-                "username": username}
+        data = {"groupname": groupname}
         headers = {'user-agent': self.u_agent}
         req_url = self.normalize_admin_url("groups")
         res = requests.post(req_url, headers=headers, auth=self.auth,
@@ -330,7 +323,7 @@ class IndigoClient(object):
 
         {
             'id': user.id,                        # str
-            'username': user.username,            # str
+            'username': user.name,                # str
             'email': user.email,                  # str
             'administrator': user.administrator,  # bool
             'active': user.active,                # bool

@@ -128,7 +128,7 @@ Remove a user::
 
 Create a group::
 
-    indigo admin mkgroup [<name>] [<owner>]
+    indigo admin mkgroup [<name>]
 
 Remove a group::
 

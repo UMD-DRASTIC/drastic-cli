@@ -21,14 +21,16 @@ Indigo Command Line Interface.
 
 Usage:
   indigo init [--url=<URL>] [--username=<USER>] [--password=<PWD>]
+  indigo whoami
   indigo exit
   indigo pwd
-  indigo ls [<path>]
+  indigo ls [<path>] [-a]
   indigo cd [<path>]
   indigo mkdir <path>
   indigo put <src> [<dest>] [--mimetype=<MIME>]
   indigo get <src> [<dest>] [--force]
   indigo rm <path>
+  indigo chmod <path> (read|write|null) <group>
   indigo meta add <path> <meta_name> <meta_value>
   indigo meta set <path> <meta_name> <meta_value>
   indigo meta rm <path> <meta_name> [<meta_value>]
@@ -42,8 +44,6 @@ Usage:
   indigo admin rmgroup [<name>]
   indigo admin atg <name> <user> ...
   indigo admin rtg <name> <user> ...
-
-
   indigo (-h | --help)
   indigo --version
 
@@ -65,6 +65,10 @@ import errno
 
 import cli
 from cli.client import IndigoClient
+from cli.acl import (
+    cdmi_str_to_str_acemask,
+    str_to_cdmi_str_acemask
+)
 
 SESSION_PATH = os.path.join(os.path.expanduser('~/.indigo'),
                             'session.pickle'
@@ -268,6 +272,33 @@ class IndigoApplication(object):
             self.print_error(res.msg())
             return res.code()
 
+    def chmod(self, args):
+        "Add or remove ACE to a path."
+        client = self.get_client(args)
+        path = args['<path>']
+        group = args['<group>']
+        if args['read']:
+            level = "read"
+        elif args['write']:
+            level = "read/write"
+        else:
+            level = "null"
+        ace = {"acetype" : "ALLOW",
+               "identifier" : group,
+               "aceflags": "CONTAINER_INHERIT, OBJECT_INHERIT",
+               "acemask" : str_to_cdmi_str_acemask(level, False)}
+        metadata = {"cdmi_acl" : [ace]}
+        
+        res = client.put(path, metadata=metadata)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            if res.code() == 403:
+                self.print_error("You don't have the rights to access ACL for this collection")
+            else:
+                self.print_error(res.msg())
+            return res.code()
+
     def cd(self, args):
         "Move into a different container."
         client = self.get_client(args)
@@ -396,6 +427,23 @@ class IndigoApplication(object):
         res = client.ls(path)
         if res.ok():
             cdmi_info = res.json()
+            if not path:
+                print "Root:"
+            else:
+                print "{}:".format(path)
+            # Display Acl
+            if args['-a']:
+                metadata = cdmi_info.get("metadata", {})
+                cdmi_acl = metadata.get("cdmi_acl", [])
+                if cdmi_acl:
+                    for ace in cdmi_acl:
+                        print "  ACL - {}: {}".format(
+                            ace['identifier'],
+                            cdmi_str_to_str_acemask(ace['acemask'], False)
+                            )
+                else:
+                    print "  ACL: No ACE defined"
+            
             if cdmi_info[u'objectType'] == u'application/cdmi-container':
                 containers = [x
                               for x in cdmi_info[u'children']
@@ -595,6 +643,11 @@ class IndigoApplication(object):
         with open(self.session_path, 'wb') as fh:
             pickle.dump(client, fh, pickle.HIGHEST_PROTOCOL)
 
+    def whoami(self, args):
+        """Print name of the user"""
+        client = self.get_client(args)
+        print client.whoami()
+
 
 def main():
     """Main function"""
@@ -635,6 +688,8 @@ def main():
         if arguments['rtg']:
             return app.admin_rtg(arguments)
 
+    elif arguments['chmod']:
+        return app.chmod(arguments)
     elif arguments['exit']:
         return app.exit(arguments)
     elif arguments['pwd']:
@@ -651,6 +706,8 @@ def main():
         return app.get(arguments)
     elif arguments['rm']:
         return app.rm(arguments)
+    elif arguments['whoami']:
+        return app.whoami(arguments)
 
 
 if __name__ == '__main__':

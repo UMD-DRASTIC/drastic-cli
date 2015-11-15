@@ -28,9 +28,17 @@ Show current working container::
 
     indigo pwd
 
+Show current authenticated user::
+
+    indigo whoami
+
 List a container::
 
     indigo ls <path>
+
+List a container wit ACL information::
+
+    indigo ls -a <path>
 
 Move to a new container::
 
@@ -64,6 +72,10 @@ Fetch a data object from the archive to a local file::
 Remove an object or a container::
 
     indigo rm <src>
+
+Add or modify an ACL to an object or a container::
+
+    indigo chmod (read|write|null) <group>
 
 
 Advanced Use - Metadata

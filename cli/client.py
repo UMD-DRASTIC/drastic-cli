@@ -168,7 +168,7 @@ class IndigoClient(object):
         req_url = self.normalize_admin_url("groups/{}".format(groupname))
         res = requests.put(req_url, headers=headers, auth=self.auth,
                            data=json.dumps(data))
-        if res.status_code in [201, 206]:
+        if res.status_code in [200, 201, 206]:
             return Response(0, res)
         else:
             return Response(res.status_code, res)
@@ -560,6 +560,18 @@ class IndigoClient(object):
             return Response(0, res)
         else:
             return Response(res.status_code, res)
+
+    def whoami(self):
+        """Return the authenticated user.
+
+        :returns: Current user
+        :rtype: str
+
+        """
+        if self.auth:
+            return self.auth[0]
+        else:
+            return "Anonymous"
 
     def open(self, path):
         """Open a URL in stream mode to avoid loading the whole content in

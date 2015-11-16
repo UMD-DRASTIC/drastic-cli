@@ -50,7 +50,7 @@ Usage:
 Options:
   -h --help     Show this screen.
   --version     Show version.
-  --url=<URL>   Location of Indigo server [default: http://127.0.0.1]
+  --url=<URL>   Location of Indigo server
 
 """
 
@@ -374,7 +374,6 @@ class IndigoApplication(object):
         This may be achieved by loading a IndigoClient with a previously saved
         session.
         """
-        url = args['--url']
         try:
             # Load existing session, so as to keep current dir etc.
             with open(self.session_path, 'rb') as fh:
@@ -382,9 +381,10 @@ class IndigoApplication(object):
         except (IOError, pickle.PickleError):
             # Init a new IndigoClient
             client = self.create_client(args)
-        if client.url != url:
-            # Init a fresh IndigoClient
-            client = self.create_client(args)
+        if args['--url']:
+            if client.url != args['--url']:
+                # Init a fresh IndigoClient
+                client = self.create_client(args)
         return client
 
     def init(self, args):

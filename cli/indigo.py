@@ -20,7 +20,7 @@ __doc_opt__ = """
 Indigo Command Line Interface.
 
 Usage:
-  indigo init [--url=<URL>] [--username=<USER>] [--password=<PWD>]
+  indigo init --url=<URL> [--username=<USER>] [--password=<PWD>]
   indigo whoami
   indigo exit
   indigo pwd
@@ -646,7 +646,7 @@ class IndigoApplication(object):
     def whoami(self, args):
         """Print name of the user"""
         client = self.get_client(args)
-        print client.whoami()
+        print client.whoami() + " - " + client.url
 
 
 def main():

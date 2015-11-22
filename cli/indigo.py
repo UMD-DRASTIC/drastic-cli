@@ -58,6 +58,7 @@ Options:
 from docopt import docopt
 from blessings import Terminal
 import os
+import sys
 import pickle
 from getpass import getpass
 from operator import methodcaller
@@ -313,6 +314,10 @@ class IndigoApplication(object):
     def create_client(self, args):
         """Return a IndigoClient."""
         url = args['--url']
+        if not url:
+            # Called without being connected
+            self.print_error("You need to be connected to access the server.")
+            sys.exit(-1)
         client = IndigoClient(url)
         # Test for client connection errors here
         res = client.get_cdmi('/')
@@ -323,6 +328,7 @@ class IndigoApplication(object):
             return client
         else:
             self.print_error(res.msg())
+            sys.exit(res.code())
 
     def exit(self, args):
         "Close CDMI client session"

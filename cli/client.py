@@ -286,6 +286,8 @@ class IndigoClient(object):
             else:
                 # Resource doesn't exist, we check if that's a container
                 return self.get_cdmi(path + '/')
+        elif res.status_code == 502:
+            return Response(res.status_code, "Unable to connect")
         try:
             return Response(0, res.json())
         except ValueError:

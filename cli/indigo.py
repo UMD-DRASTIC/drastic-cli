@@ -46,30 +46,42 @@ Usage:
   indigo admin rtg <name> <user> ...
   indigo (-h | --help)
   indigo --version
+  indigo mput-prepare [-l label] (--walk <file-list> | --read (<source-dir>|-))
+  indigo mput-execute [-l label] <tgt-dir-in-repo>
+  indigo mput (--walk|--read)     (<file-list>|<source-dir>|-) <tgt-dir-in-repo>
+  indigo mput-status [-l label] [--reset]
 
 Options:
   -h --help     Show this screen.
   --version     Show version.
   --url=<URL>   Location of Indigo server
+  -l --label    a label to have multiple prepares and executes simultaneously [  default: transfer ]
+  --reset       reset all 'in-progress' entries to 'ready' in the work queue
+
+
+Arguments:
+  <tgt-dir-in-repo>    where to place the files when you inject them [ default: / ]
+
+
 
 """
 
-
-from docopt import docopt
-from blessings import Terminal
+import errno
 import os
-import sys
 import pickle
+import sys
 from getpass import getpass
 from operator import methodcaller
-import errno
+
+from blessings import Terminal
+from docopt import docopt
 
 import cli
-from cli.client import IndigoClient
 from cli.acl import (
     cdmi_str_to_str_acemask,
     str_to_cdmi_str_acemask
 )
+from cli.client import IndigoClient
 
 SESSION_PATH = os.path.join(os.path.expanduser('~/.indigo'),
                             'session.pickle'
@@ -654,6 +666,22 @@ class IndigoApplication(object):
         client = self.get_client(args)
         print client.whoami() + " - " + client.url
 
+    def mput(self, arguments):
+        import mput
+        return mput.mput(self,arguments)
+
+    def mput_prepare(self,arguments):
+        import mput
+        return mput.mput_prepare(self, arguments)
+
+    def mput_execute(self,arguments):
+        import mput
+        return mput.mput_execute(self, arguments)
+
+    def mput_status(self,arguments):
+        import mput
+        return mput.mput_status(self, arguments)
+
 
 def main():
     """Main function"""
@@ -714,6 +742,14 @@ def main():
         return app.rm(arguments)
     elif arguments['whoami']:
         return app.whoami(arguments)
+    elif arguments['mput-prepare'] :
+        return app.mput_prepare(arguments)
+    elif arguments['mput-execute'] :
+        return app.mput_execute(arguments)
+    elif arguments['mput-status'] :
+        return app.mput_status(arguments)
+    elif arguments['mput'] :
+        return app.mput(arguments)
 
 
 if __name__ == '__main__':

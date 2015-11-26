@@ -86,8 +86,8 @@ class DB:
         self.cs.connection.commit()
         return ret
 
-    def status(self) :
-        self.cs.execute('SELECT state,count(*) from {0} group by state order by state')
+    def status(self ) :
+        self.cs.execute('SELECT state,count(*) from {0} group by state order by state'.format(self.label))
         retval = u''
         for k in self.cs :
             retval += '{0}\t{1:,}\n'.format(*k)

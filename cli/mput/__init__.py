@@ -86,11 +86,17 @@ class DB:
         self.cs.connection.commit()
         return ret
 
-    def status(self ) :
-        self.cs.execute('SELECT state,count(*) from {0} group by state order by state'.format(self.label))
+    def status(self , reset = False) :
+        friendly = dict(DONE = 'Done',FAIL = 'Failed' , RDY = 'Ready' , WRK = 'Processing')
+        self.cs.execute('SELECT state,count(*),avg(end_time-start_time) from {0} group by state order by state'.format(self.label))
         retval = u''
+        retval  = '{0:10s} |{1:23s} |{2:20s}\n'.format('State','Count','Average time in State')
+        retval += '{0:10s} |{1:23s} |{2:20s}\n'.format('-'*10,'-'*23,'-'*20)
+
         for k in self.cs :
-            retval += '{0}\t{1:,}\n'.format(*k)
+            k = list(k)
+            k[0] = friendly[k[0]]
+            retval += '{0:10s} |{1:23,} |{2:20.2f}\n'.format(*k)
         return retval
 
 

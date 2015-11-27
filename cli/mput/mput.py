@@ -32,7 +32,7 @@ def mput(app, arguments):
             indigo mput --walk <source-dir>     <tgt-dir-in-repo>
             indigo mput --read (<file-list>|-)  <tgt-dir-in-repo>
 
-    :param app:
+    :param "IndigoApplication" app:
     :param arguments:
     :return:
     """

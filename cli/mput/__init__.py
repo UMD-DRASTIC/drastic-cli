@@ -18,16 +18,17 @@ limitations under the License.
 
 """
 
-
 import os
 from collections import OrderedDict
 
+from .mput import mput
+from .mput_execute import mput_execute
+from .mput_prepare import mput_prepare
+from .mput_status import mput_status
+
 __all__ = ( 'mput' ,   'mput-prepare' , 'mput_status' , 'mput_execute' )
-from db import DB
-from mput import mput
 
-
-
+NUM_THREADS = 8
 
 """
   indigo mput-prepare [-l label] (-walk <file-list> | -read (<source-dir>|-))
@@ -38,19 +39,20 @@ from mput import mput
 
 #### Pull paths from the database and put 'em ...
 class LimitedSizeDict(OrderedDict):
-  def __init__(self, *args, **kwds):
-    self.size_limit = kwds.pop("size_limit", None)
-    OrderedDict.__init__(self, *args, **kwds)
-    self._check_size_limit()
+    def __init__(self, *args, **kwds):
+        self.size_limit = kwds.pop("size_limit", None)
+        OrderedDict.__init__(self, *args, **kwds)
+        self._check_size_limit()
 
-  def set(self, key, value):
-    OrderedDict.__setitem__(self, key, value)
-    self._check_size_limit()
+    def set(self, key, value):
+        OrderedDict.__setitem__(self, key, value)
+        self._check_size_limit()
 
-  def _check_size_limit(self):
-    if self.size_limit is not None:
-      while len(self) > self.size_limit:
-        self.popitem(last=False)
+    def _check_size_limit(self):
+        if self.size_limit is not None:
+            while len(self) > self.size_limit:
+                self.popitem(last=False)
+
 
 class _dirmgmt(LimitedSizeDict) :
     def __init__(self,*args,**kwds):

@@ -109,13 +109,23 @@ class DB:
     def status(self , reset = False) :
         friendly = dict(DONE = 'Done',FAIL = 'Failed' , RDY = 'Ready' , WRK = 'Processing')
         self.cs.execute('SELECT state,count(*),avg(end_time-start_time) from {0} group by state order by state'.format(self.label))
-        retval = u''
-        retval  = '{0:10s} |{1:23s} |{2:20s}\n'.format('State','Count','Average time in State')
+
+        retval  = u'{0:10s} |{1:23s} |{2:20s}\n'.format('State','Count','Average time in State')
         retval += '{0:10s} |{1:23s} |{2:20s}\n'.format('-'*10,'-'*23,'-'*20)
 
         for k in self.cs :
             k = list(k)
             k[0] = friendly[k[0]]
             retval += '{0:10s} |{1:23,} |{2:20.2f}\n'.format(*k)
+
+        ### See if we need to reset the work queue
+        if reset :
+            cmd = '''UPDATE {0}
+                        SET state = 'RDY', start_time=strftime('%s','now'), end_time = strftime('%s','now')
+                        WHERE STATE = 'FAIL' or 'STATE' = 'WRK' '''.format(self.label)
+            self.cs.execute(cmd)
+            self.cs.connection.commit()
+            retval += u'\n\n    Failed and Processing values reset after.'
+        # And now return the status
         return retval
 

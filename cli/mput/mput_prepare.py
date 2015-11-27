@@ -20,10 +20,7 @@
     limitations under the License.
 """
 
-import os
-import sys
-import time
-
+from .mput_threads import *
 
 def mput_prepare(app, arguments):
     db = DB(app, arguments)

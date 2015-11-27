@@ -25,8 +25,6 @@ import time
 
 
 def mput(app, arguments):
-
-
     db = DB(app, arguments)
 
     ### Instrumentation

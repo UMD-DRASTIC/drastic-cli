@@ -23,8 +23,8 @@ import os
 import sys
 import time
 
-from mput_threads import thread_setup, file_putter
-from . import NUM_THREADS
+from .mput_threads import thread_setup, file_putter
+from .utils import _dirmgmt
 
 
 def mput(app, arguments):
@@ -36,10 +36,10 @@ def mput(app, arguments):
     :param arguments:
     :return:
     """
-
+    global NUM_THREADS
     ####################  Abstract the source of file names into an iterator #########
     if arguments['--walk']:
-        src = arguments['<source-dir']
+        src = arguments['<source-dir>']
         if not os.path.isdir(src):
             raise ValueError(src)
 
@@ -72,21 +72,31 @@ def mput(app, arguments):
     tgtdir = arguments['<tgt-dir-in-repo>']
     q, threads = thread_setup(NUM_THREADS, None, None, client)
 
-
+    ### Set up a directory name cache, so that we don't have to keep going back
+    cache = _dirmgmt()
     ### Instrumentation
     t0 = time.time()
     t1 = t0
     ctr = 0
     ### Actual mput loop ###
     for path in _src:
+        tgtfile = os.path.join(tgtdir, path.strip('/'))
+        n1, _ = os.path.split(tgtfile)
+        if n1:
+            cache.getdir(n1, client)
+
         if not os.path.isfile(path):
             print >> sys.stderr, "skipping -- file does not exist or is not a dir : ", path
             continue
-        tgtfile = os.path.join(tgtdir, path.strip('/'))
+
+        print "putting ", (path, tgtfile, None)
+
         q.put((path, tgtfile, None))
         if NUM_THREADS == 0:
             file_putter(q, client, None, None, one_shot=True)  # forced Serialization...
 
+    if NUM_THREADS > 0:
+        q.join()
     #####################
     # Summary
     t2 = time.time()

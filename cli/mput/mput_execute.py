@@ -20,7 +20,6 @@
 """
 import os
 
-from . import NUM_THREADS, _dirmgmt
 from .db import DB
 from .mput_threads import *
 

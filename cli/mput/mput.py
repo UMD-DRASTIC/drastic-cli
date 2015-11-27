@@ -23,45 +23,70 @@ import os
 import sys
 import time
 
+from mput_threads import thread_setup, file_putter
+from . import NUM_THREADS
+
 
 def mput(app, arguments):
-    db = DB(app, arguments)
+    """
+            indigo mput --walk <source-dir>     <tgt-dir-in-repo>
+            indigo mput --read (<file-list>|-)  <tgt-dir-in-repo>
+
+    :param app:
+    :param arguments:
+    :return:
+    """
+
+    ####################  Abstract the source of file names into an iterator #########
+    if arguments['--walk']:
+        src = arguments['<source-dir']
+        if not os.path.isdir(src):
+            raise ValueError(src)
+
+        def reader(dirname):
+            for path, _, files in os.walk(dirname, topdown=True, followlinks=True):
+                for fn in files: yield os.path.abspath(os.path.join(path, fn))
+
+        _src = reader(src)
+    elif arguments['--read']:
+        if arguments['<file-list>'] == '-':
+            fp = sys.stdin
+        else:
+            fp = open(arguments['<file-list>'], 'rb')
+
+        def reader(fp):
+            for l in fp:
+                l = l.strip()
+                if not l: continue
+                yield os.path.normpath(l)
+
+        #### End Function ####
+        _src = reader(fp)
+    else:
+        ### This should never happen !
+        raise NotImplementedError('Docopt args inconsistent')
+    ####
+    #### Now get the list of files and push 'em onto the queue...
+    ####
+    client = app.get_client(arguments)
+    tgtdir = arguments['<tgt-dir-in-repo>']
+    q, threads = thread_setup(NUM_THREADS, None, None, client)
+
 
     ### Instrumentation
     t0 = time.time()
     t1 = t0
     ctr = 0
-    ####################
-    if arguments['--walk']:
-        tree = arguments['<file-list>']
-        if '~' in tree : tree = os.path.expanduser(tree)
-        if not tree or not os.path.isdir(tree):
-            raise ValueError("can't find the tree to walk ")
-        tree = os.path.abspath(tree)
+    ### Actual mput loop ###
+    for path in _src:
+        if not os.path.isfile(path):
+            print >> sys.stderr, "skipping -- file does not exist or is not a dir : ", path
+            continue
+        tgtfile = os.path.join(tgtdir, path.strip('/'))
+        q.put((path, tgtfile, None))
+        if NUM_THREADS == 0:
+            file_putter(q, client, None, None, one_shot=True)  # forced Serialization...
 
-        for dirname,_,files in os.walk(tree,topdown=True,followlinks=True) :
-            for fn in files :
-                ctr += 1
-                db.insert(os.path.abspath(os.path.join(dirname,fn)).decode('utf-8'))
-            t2 = time.time()
-            if ( t2 - t1 ) > 30 :
-                print '{0:,} registered in {1:.2f} secs -- {2}/sec'.format(ctr, (t2-t1), ctr / (t2 - t0))
-                t1 = t2
-    ####################
-    elif arguments['--read'] :
-        if arguments['<file-list>'] == '-' : fp = sys.stdin
-        else : fp = open(arguments['<file-list>'],'rU')
-        for path in fp :
-            if not os.path.exists(path) :
-                print >>sys.stderr,"skipping -- file does not exist : ",path
-                continue
-            ctr += 1
-            db.insert(os.path.abspath( path).decode('utf-8'))
-            if ctr% 5000 :
-                t2 = time.time()
-                if ( t2 - t1 ) > 30 :
-                    print '{0:,} registered in {1:.2f} secs -- {2:.2f}/sec'.format(ctr, (t2-t1), ctr / (t2 - t0))
-                    t1 = t2
     #####################
     # Summary
     t2 = time.time()

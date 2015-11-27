@@ -20,8 +20,11 @@
 """
 import os
 
+from .config import NUM_THREADS
 from .db import DB
 from .mput_threads import *
+from .utils import _dirmgmt
+
 
 
 def mput_execute(app, arguments):

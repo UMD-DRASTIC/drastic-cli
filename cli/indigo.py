@@ -48,7 +48,8 @@ Usage:
   indigo --version
   indigo mput-prepare [-l label] (--walk <file-list> | --read (<source-dir>|-))
   indigo mput-execute [-l label] <tgt-dir-in-repo>
-  indigo mput (--walk|--read)     (<file-list>|<source-dir>|-) <tgt-dir-in-repo>
+  indigo mput --walk <source-dir>     <tgt-dir-in-repo>
+  indigo mput --read (<file-list>|-)  <tgt-dir-in-repo>
   indigo mput-status [-l label] [--reset]
 
 Options:

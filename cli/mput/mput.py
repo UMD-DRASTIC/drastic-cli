@@ -23,6 +23,7 @@ import os
 import sys
 import time
 
+from .config import NUM_THREADS
 from .mput_threads import thread_setup, file_putter
 from .utils import _dirmgmt
 
@@ -36,7 +37,7 @@ def mput(app, arguments):
     :param arguments:
     :return:
     """
-    global NUM_THREADS
+
     ####################  Abstract the source of file names into an iterator #########
     if arguments['--walk']:
         src = arguments['<source-dir>']

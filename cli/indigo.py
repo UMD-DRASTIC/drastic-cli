@@ -73,6 +73,7 @@ import sys
 from getpass import getpass
 from operator import methodcaller
 
+import requests
 from blessings import Terminal
 from docopt import docopt
 
@@ -403,6 +404,7 @@ class IndigoApplication(object):
             if client.url != args['--url']:
                 # Init a fresh IndigoClient
                 client = self.create_client(args)
+        client.session = requests.Session()
         return client
 
     def init(self, args):

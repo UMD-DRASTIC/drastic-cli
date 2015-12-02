@@ -29,11 +29,15 @@ class DB:
         p = app.session_path
         if os.path.isfile(p): p,_ = os.path.split(p)
         self.dbname = os.path.join( p , 'work_queue.db')
+        if not os.path.isfile(self.dbname):
+            if not os.path.isdir(p):
+                raise RuntimeError('{} does not exist or is not a directory ... please do an init first'.format(p))
+
         try :
             self.cnx = sqlite3.connect(self.dbname , check_same_thread = False )
         except Exception as e :
             print e
-            print "Cannot open ",p
+            raise RuntimeError("Cannot open {}".format(self.dbname))
         #####
         self.cs = self.cnx.cursor()
 
@@ -45,7 +49,7 @@ class DB:
         if not label: label = 'transfer'
         self.label = label
 
-        self.cs.execute('''CREATE TABLE IF NOT EXISTS {0}
+        self.cs.execute('''CREATE TABLE IF NOT EXISTS "{0}"
                 (row_id INTEGER PRIMARY KEY AUTOINCREMENT ,
                  path TEXT,  name TEXT,
                  state TEXT CHECK (state in ('RDY','WRK','DONE','FAIL')) NOT NULL DEFAULT 'RDY'  ,
@@ -53,10 +57,14 @@ class DB:
                  end_time INTEGER ,
                  UNIQUE ( path,name )
                   ) '''.format(label))
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS {0}_state_idx ON {0}(state) where state =  'DONE' '''.format(label))
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS {0}_state1_idx ON {0}(state) where state <> 'DONE' '''.format(label))
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS {0}_path_idx ON {0}(path) WHERE state = 'RDY' '''.format(label))
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS {0}_path1_idx ON {0}(path)   '''.format(label))
+        self.cs.execute(
+            '''CREATE INDEX IF NOT EXISTS "{0}_state_idx" ON "{0}"(state) where state =  'DONE' '''.format(label))
+        self.cs.execute(
+            '''CREATE INDEX IF NOT EXISTS "{0}_state1_idx" ON "{0}"(state) where state <> 'DONE' '''.format(label))
+        self.cs.execute(
+            '''CREATE INDEX IF NOT EXISTS "{0}_path_idx" ON "{0}"(path) WHERE state = 'RDY' '''.format(label))
+        self.cs.execute('''CREATE INDEX IF NOT EXISTS "{0}_path1_idx" ON "{0}"(path)   '''.format(label))
+
 
     def update(self, rowid, state):
         if state == 'WRK':

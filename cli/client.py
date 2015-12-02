@@ -20,9 +20,10 @@ import json
 import mimetypes
 import mmap
 import os
-import requests
 from base64 import b64encode
 from urllib import pathname2url, url2pathname
+
+import requests
 
 import cli
 
@@ -668,4 +669,4 @@ class IndigoClient(object):
             # PUT the data in non-CDMI to avoid unnecessary base64 overhead
             #req_url = self.normalize_cdmi_url(path)
             self.put_http(path, data, mimetype)
-            return self.get_cdmi(path)
+            return self.get_cdmi(os.path.split(path)[0])

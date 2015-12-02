@@ -27,12 +27,20 @@ import sys
 class DB:
     def __init__(self, app, args):
         p = app.session_path
+
+        # construct the path
         if os.path.isfile(p): p,_ = os.path.split(p)
         self.dbname = os.path.join( p , 'work_queue.db')
-        if not os.path.isfile(self.dbname):
-            if not os.path.isdir(p):
-                raise RuntimeError('{} does not exist or is not a directory ... please do an init first'.format(p))
 
+        # if the directory doesn't exist try to make it.
+        if not os.path.isdir(p):
+            try:
+                os.mkdir(p)
+            except Exception as e:
+                print 'cannot make directory {}'.format(p)
+                raise
+
+        # open or create the database
         try :
             self.cnx = sqlite3.connect(self.dbname , check_same_thread = False )
         except Exception as e :
@@ -41,12 +49,8 @@ class DB:
         #####
         self.cs = self.cnx.cursor()
 
-        label = None
-        if '--label' in args:
-            label = args['--label']
-        if not label and '-l' in args:
-            label = args['-l']
-        if not label: label = 'transfer'
+        # set the label to the first candidate...
+        label = filter(bool, [args.get('--label', None), args.get('-l', None), 'transfer'])[0]
         self.label = label
 
         self.cs.execute('''CREATE TABLE IF NOT EXISTS "{0}"

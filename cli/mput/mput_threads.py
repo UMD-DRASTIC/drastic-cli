@@ -23,6 +23,8 @@ import time
 from Queue import Queue
 from threading import Thread
 
+from requests import ConnectionError
+
 
 def file_putter(q, client, cnx, label='transfer', one_shot=False):
     """
@@ -36,28 +38,54 @@ def file_putter(q, client, cnx, label='transfer', one_shot=False):
         cs = cnx.cursor()
         stmt1 = '''UPDATE {0} SET state = ? ,start_time=? , end_time = ? Where row_id = ?'''.format(label)
 
+    total_len = 0
     while True:
         src, target, row_id = q.get()
         T0 = time.time()
+        fail = False
         with open(src, 'rb') as fh:
-            res = client.put(target, fh)
+            try:
+                from io import SEEK_CUR
+                res = client.put(target, fh)
 
-            if cnx and row_id:
+            except ConnectionError as e:
+                fail = True
+            except Exception as e:
+                print u'failed to put {} to {}'.format(src, target)
+                print e
+                # Since it wasn't a connection error abandon this one .. mark as failed.
+                fail = True
+
+            if fail:
                 T1 = time.time()
-                if res.ok():
-                    cs.execute(stmt1, ('DONE', T0, T1, row_id))
-                    cs.connection.commit()
+                cs.execute(stmt1, ('FAIL', T0, T1, row_id))
+                cs.connection.commit()
+                q.task_done()
+                if one_shot:
+                    return
                 else:
-                    print >> sys.stderr, res.msg(), '\n', target
-                    cs.execute(stmt1, ('FAIL', T0, T1, row_id))
-                    cs.connection.commit()
-                    q.put((src, target, row_id))  # Stick it back on and try later...
+                    continue
+
+                    # The Put apparently succeeded...
+                    # total_len += fh.seek(0, SEEK_CUR)  #
+
+        if cnx and row_id:
+            T1 = time.time()
+            if res.ok():
+                cs.execute(stmt1, ('DONE', T0, T1, row_id))
+                cs.connection.commit()
             else:
-                if not res.ok():
-                    print res.msg()
-                    q.put((src, target, row_id))  # Stick it back on and try later...
+                print >> sys.stderr, res.msg(), '\n', target
+                cs.execute(stmt1, ('FAIL', T0, T1, row_id))
+                cs.connection.commit()
+                q.put((src, target, row_id))  # Stick it back on and try later...
+        else:
+            if not res.ok():
+                print res.msg()
+                q.put((src, target, row_id))  # Stick it back on and try later...
         q.task_done()  # Acknowledge that task has completed...
-        if one_shot: return
+        if one_shot:
+            return
 
 
 def thread_setup(N, cnx, label, client, target=file_putter):

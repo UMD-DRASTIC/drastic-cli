@@ -42,9 +42,9 @@ def mput_execute(app, arguments):
         thisdir = db.get_and_lock()
         if not thisdir: break
         ctr1 = 0
-        if not thisdir: continue
         # Start by ensuring there is a container to go into...
-        tgtdir = os.path.normpath(os.path.join(tgt_prefix, path.lstrip('/')))
+        path = thisdir[0][0]
+        tgtdir = os.path.normpath(os.path.join(unicode(tgt_prefix), path.lstrip('/')))
         try:
             dir_cache.getdir(tgtdir, client)  # Load the path (and its parents) into the cache....
         except Exception as e:

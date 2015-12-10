@@ -50,7 +50,7 @@ Usage:
   indigo mput-execute [-l label] <tgt-dir-in-repo>
   indigo mput --walk <source-dir>     <tgt-dir-in-repo>
   indigo mput --read (<file-list>|-)  <tgt-dir-in-repo>
-  indigo mput-status [-l label] [--reset]
+  indigo mput-status [-l label] [--reset] [(--clear|--clean)]
 
 Options:
   -h --help     Show this screen.
@@ -58,6 +58,8 @@ Options:
   --url=<URL>   Location of Indigo server
   -l --label    a label to have multiple prepares and executes simultaneously [  default: transfer ]
   --reset       reset all 'in-progress' entries to 'ready' in the work queue
+  --clear       remove all the entries in the workqueue
+  --clean       remove all the 'DONE' entries in the workqueue
 
 
 Arguments:

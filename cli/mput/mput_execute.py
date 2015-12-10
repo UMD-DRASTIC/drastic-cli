@@ -61,7 +61,7 @@ def mput_execute(app, arguments):
                 file_putter(q, client, db.cnx, db.label, one_shot=True)
         ctr += ctr1
         T2 = time.time()
-        print '{tgtdir} : {ctr1} files in {T21}s = {ctr1_T21}/sec , {ctr} total files  in {T20} = {ctr_T20}/sec'.format(
+        print '{tgtdir} : {ctr1} files in {T21:.2f}s = {ctr1_T21:.2f}/sec , {ctr} total files in {T20:.2f} = {ctr_T20:.2}/sec'.format(
             tgtdir=tgtdir, ctr=ctr, ctr1=ctr1, T20=T2 - T0, T21=T2 - T1, ctr1_T21=ctr1 / (T2 - T1),
             ctr_T20=ctr / (T2 - T0)
         )

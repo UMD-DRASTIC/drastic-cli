@@ -38,7 +38,7 @@ def mput_prepare(app, arguments):
         if '~' in tree : tree = os.path.expanduser(tree)
         if not tree or not os.path.isdir(tree):
             raise ValueError("can't find the tree to walk ")
-        tree = os.path.abspath(tree)
+        tree = os.path.normpath(tree)
 
         for dirname,_,files in os.walk(tree,topdown=True,followlinks=True) :
             for fn in files :

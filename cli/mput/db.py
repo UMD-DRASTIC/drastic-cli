@@ -112,7 +112,7 @@ class DB:
         if not os.path.exists(path):
             print >> sys.stderr, '{0} does not exist ...skipping '.format(path)
             return None
-        p1, n1 = os.path.split(os.path.abspath(path))  # Avoid naive duplication
+        p1, n1 = os.path.split(os.path.normpath(path))  # Avoid naive duplication
         cmd = '''insert or ignore INTO {0} (path,name,state) VALUES ( ? , ? , ? )'''.format(self.label)
         self.cs.execute(cmd, (p1, n1, 'RDY'))
         ret =  self.cs.lastrowid

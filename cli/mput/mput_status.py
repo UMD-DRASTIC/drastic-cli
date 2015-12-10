@@ -25,7 +25,9 @@ import sys
 from .db import DB
 
 def mput_status(app, arguments):
-    reset_flag = bool(  arguments['--reset']  )
+    reset_flag = bool(arguments.get('--reset', False))
+    clean_flag = bool(arguments.get('--clean', False))
+    clear_flag = bool(arguments.get('--clear', False))
     db = DB(app, arguments)
-    print >>sys.stdout,db.status(reset_flag)
+    print >> sys.stdout, db.status(reset=reset_flag, clear=clear_flag, clean=clean_flag)
     return None

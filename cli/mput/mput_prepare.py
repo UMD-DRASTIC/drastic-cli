@@ -43,7 +43,7 @@ def mput_prepare(app, arguments):
         for dirname,_,files in os.walk(tree,topdown=True,followlinks=True) :
             for fn in files :
                 ctr += 1
-                db.insert(os.path.abspath(os.path.join(dirname,fn)).decode('utf-8'))
+                db.insert(os.path.normpath(os.path.join(dirname, fn)).decode('utf-8'))
             t2 = time.time()
             if ( t2 - t1 ) > 30 :
                 print '{0:,} registered in {1:.2f} secs -- {2}/sec'.format(ctr, (t2-t1), ctr / (t2 - t0))
@@ -63,6 +63,7 @@ def mput_prepare(app, arguments):
                 if ( t2 - t1 ) > 30 :
                     print '{0:,} registered in {1:.2f} secs -- {2:.2f}/sec'.format(ctr, (t2-t1), ctr / (t2 - t0))
                     t1 = t2
+
     #####################
     # Summary
     t2 = time.time()

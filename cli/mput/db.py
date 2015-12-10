@@ -101,6 +101,7 @@ class DB:
         if data :
             self.cs.executemany(cmd,data)
             self.cs.connection.commit()
+        # And unicode the results...
         return results
 
     def insert(self, path):
@@ -118,26 +119,49 @@ class DB:
         self.cs.connection.commit()
         return ret
 
-    def status(self , reset = False) :
+    def status(self, reset=False, clear=False, clean=False):
         friendly = dict(DONE = 'Done',FAIL = 'Failed' , RDY = 'Ready' , WRK = 'Processing')
         self.cs.execute('SELECT state,count(*),avg(end_time-start_time) from {0} group by state order by state'.format(self.label))
 
-        retval  = u'{0:10s} |{1:23s} |{2:20s}\n'.format('State','Count','Average time in State')
-        retval += '{0:10s} |{1:23s} |{2:20s}\n'.format('-'*10,'-'*23,'-'*20)
+        retval = u'{:10s} |{:23s} |{:20s}\n'.format('State', 'Count', 'Average time in State')
+        retval += '{:10s} |{:23s} |{:20s}\n'.format('-' * 10, '-' * 23, '-' * 20)
 
-        for k in self.cs :
-            k = list(k)
-            k[0] = friendly[k[0]]
-            retval += '{0:10s} |{1:23,} |{2:20.2f}\n'.format(*k)
+        for state, count, avg in self.cs:
+
+            state = friendly[state]
+            ## Odd, avg seems to return a string !?  We shouldn't have to do this!!
+            if isinstance(avg, basestring):
+                avg = (' ' * 20 + avg)[-20:]  # Make average 20 characters long
+            elif isinstance(avg, float):
+                avg = '{:20.2f}'.format(avg)  # otherwise format it as 20 chars long
+            try:
+                retval += '{0:10s} |{1:23,} |{2}\n'.format(state, count, avg)
+            except:
+                retval += '{0:10s} |{1:23s} |{2}\n'.format(str(state), str(count), str(avg))
+            ### Done oddball fix
 
         ### See if we need to reset the work queue
-        if reset :
-            cmd = '''UPDATE {0}
-                        SET state = 'RDY', start_time=strftime('%s','now'), end_time = strftime('%s','now')
-                        WHERE STATE = 'FAIL' or 'STATE' = 'WRK' '''.format(self.label)
-            self.cs.execute(cmd)
-            self.cs.connection.commit()
-            retval += u'\n\n    Failed and Processing values reset after.'
+        try:
+            if reset:
+                cmd = '''UPDATE "{0}"
+                            SET state = 'RDY', start_time=strftime('%s','now'), end_time = strftime('%s','now')
+                            WHERE STATE = 'FAIL' or 'STATE' = 'WRK' '''.format(self.label)
+                self.cs.execute(cmd)
+                self.cs.connection.commit()
+                retval += u'\n\n    Failed and Processing values reset after.'
+            if clean:
+                cmd = '''DELETE from "{0}" where state = 'DONE' '''.format(self.label)
+                self.cs.execute(cmd)
+                self.cs.connection.commit()
+            if clear:
+                # Since sqlite doesn't have a truncate command, just drop the table -- it will be recreated if necessary
+                cmd = u'drop table "{0}"'.format(self.label)
+                self.cs.execute(cmd)
+                self.cs.connection.commit()
+        except sqlite3.DatabaseError as e:
+            print e
+            print 'Failed to process cmd -- \n{}\n'.format(cmd)
+
         # And now return the status
         return retval
 

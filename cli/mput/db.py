@@ -92,7 +92,7 @@ class DB:
         self.cs.execute('''BEGIN''')
         ## Select A Path's worth of files.... where some are
         cmd = '''WITH DIR as ( SELECT path from {0} WHERE STATE = 'RDY' LIMIT 1)
-                    SELECT path ,name,start_time,end_time,row_id from {0} JOIN DIR USING (path)
+                    SELECT path ,name,start_time,end_time,row_id from {0} JOIN DIR USING (path) where STATE = 'RDY'
             '''.format(self.label)
         self.cs.execute(cmd)
         results = self.cs.fetchall()

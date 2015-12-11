@@ -71,10 +71,13 @@ class DB:
                  end_time INTEGER ,
                  UNIQUE ( path,name )
                   ) ''' )
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state_idx"  ON "transfer"(state) where state =  'DONE' ''' )
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state1_idx" ON "transfer"(state) where state <> 'DONE' ''')
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path_idx"   ON "transfer"(path) WHERE state = 'RDY' ''' )
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
+        try:
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state_idx"  ON "transfer"(state) where state =  'DONE' ''' )
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state1_idx" ON "transfer"(state) where state <> 'DONE' ''')
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path_idx"   ON "transfer"(path) WHERE state = 'RDY' ''' )
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
+        except Exception as e :
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS t_state_idx  ON transfer (state)''' )
 
 
     def update(self, rowid, state):

@@ -26,7 +26,7 @@ from threading import Thread
 from requests import ConnectionError
 
 
-def file_putter(q, client, cnx, label='transfer', one_shot=False):
+def file_putter(q, client, cnx,  one_shot=False):
     """
     :param q: the queue from which src and target files will be called
     :param client:  the client object that implements the various CDMI calls to the host
@@ -36,7 +36,7 @@ def file_putter(q, client, cnx, label='transfer', one_shot=False):
     """
     if cnx:
         cs = cnx.cursor()
-        stmt1 = '''UPDATE {0} SET state = ? ,start_time=? , end_time = ? Where row_id = ?'''.format(label)
+        stmt1 = '''UPDATE transfer SET state = ? ,start_time=? , end_time = ? Where row_id = ?'''
 
     total_len = 0
     while True:
@@ -88,7 +88,7 @@ def file_putter(q, client, cnx, label='transfer', one_shot=False):
             return
 
 
-def thread_setup(N, cnx, label, client, target=file_putter):
+def thread_setup(N, cnx, client, target=file_putter):
     """
 
     :param N: Number of worker threads...
@@ -101,7 +101,7 @@ def thread_setup(N, cnx, label, client, target=file_putter):
     q = Queue(4096)
     threads = []
     for k in xrange(N):
-        t = Thread(target=target, args=(q, client, cnx, label, False))
+        t = Thread(target=target, args=(q, client, cnx,  False))
         t.setDaemon(True)
         t.start()
         threads.append(t)

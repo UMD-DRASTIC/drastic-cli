@@ -28,9 +28,21 @@ class DB:
     def __init__(self, app, args):
         p = app.session_path
 
+        # set the label to the first candidate...
+        label = filter(bool, [args.get('--label', None), args.get('-l', None), 'transfer'])[0]
+        # Create a 'safe' version of the label
+        def safe(s):
+            import hashlib,base64
+            v = base64.b64encode(hashlib.md5(s).digest(),'-#').rstrip('=')
+            return v
+        if label == 'transfer' :
+            safename = 'work_queue-00.db'
+        else:
+            safename = 'work_queue-{}.db'.format(safe(label))
+
         # construct the path
         if os.path.isfile(p): p,_ = os.path.split(p)
-        self.dbname = os.path.join( p , 'work_queue.db')
+        self.dbname = os.path.join( p , safename )
 
         # if the directory doesn't exist try to make it.
         if not os.path.isdir(p):
@@ -49,32 +61,27 @@ class DB:
         #####
         self.cs = self.cnx.cursor()
 
-        # set the label to the first candidate...
-        label = filter(bool, [args.get('--label', None), args.get('-l', None), 'transfer'])[0]
-        self.label = label
 
-        self.cs.execute('''CREATE TABLE IF NOT EXISTS "{0}"
+
+        self.cs.execute('''CREATE TABLE IF NOT EXISTS transfer
                 (row_id INTEGER PRIMARY KEY AUTOINCREMENT ,
                  path TEXT,  name TEXT,
                  state TEXT CHECK (state in ('RDY','WRK','DONE','FAIL')) NOT NULL DEFAULT 'RDY'  ,
                  start_time INTEGER default CURRENT_TIMESTAMP,
                  end_time INTEGER ,
                  UNIQUE ( path,name )
-                  ) '''.format(label))
-        self.cs.execute(
-            '''CREATE INDEX IF NOT EXISTS "{0}_state_idx" ON "{0}"(state) where state =  'DONE' '''.format(label))
-        self.cs.execute(
-            '''CREATE INDEX IF NOT EXISTS "{0}_state1_idx" ON "{0}"(state) where state <> 'DONE' '''.format(label))
-        self.cs.execute(
-            '''CREATE INDEX IF NOT EXISTS "{0}_path_idx" ON "{0}"(path) WHERE state = 'RDY' '''.format(label))
-        self.cs.execute('''CREATE INDEX IF NOT EXISTS "{0}_path1_idx" ON "{0}"(path)   '''.format(label))
+                  ) ''' )
+        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state_idx"  ON "transfer"(state) where state =  'DONE' ''' )
+        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state1_idx" ON "transfer"(state) where state <> 'DONE' ''')
+        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path_idx"   ON "transfer"(path) WHERE state = 'RDY' ''' )
+        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
 
 
     def update(self, rowid, state):
         if state == 'WRK':
-            cmd = '''UPDATE {0} SET state = ? , start_time = strftime('%s','now') Where row_id = ?'''.format(self.label)
+            cmd = '''UPDATE transfer SET state = ? , start_time = strftime('%s','now') Where row_id = ?'''
         else:
-            cmd = '''UPDATE {0} SET state = ? , end_time = strftime('%s','now') Where row_id = ?'''.format(self.label)
+            cmd = '''UPDATE transfer SET state = ? , end_time = strftime('%s','now') Where row_id = ?'''
         try:
             self.cs.execute(cmd, [state, rowid])
             self.cs.connection.commit()
@@ -91,13 +98,13 @@ class DB:
         """
         self.cs.execute('''BEGIN''')
         ## Select A Path's worth of files.... where some are
-        cmd = '''WITH DIR as ( SELECT path from {0} WHERE STATE = 'RDY' LIMIT 1)
-                    SELECT path ,name,start_time,end_time,row_id from {0} JOIN DIR USING (path) where STATE = 'RDY'
-            '''.format(self.label)
+        cmd = '''WITH DIR as ( SELECT path from transfer WHERE STATE = 'RDY' LIMIT 1)
+                    SELECT path ,name,start_time,end_time,row_id from transfer JOIN DIR USING (path) where STATE = 'RDY'
+            '''
         self.cs.execute(cmd)
         results = self.cs.fetchall()
         data = [data[-1:] for data in results]
-        cmd = '''UPDATE {0} SET STATE = 'WRK' , start_time = strftime('%s','now') WHERE row_id = ?'''.format(self.label)
+        cmd = '''UPDATE transfer SET STATE = 'WRK' , start_time = strftime('%s','now') WHERE row_id = ?'''
         if data :
             self.cs.executemany(cmd,data)
             self.cs.connection.commit()
@@ -113,7 +120,7 @@ class DB:
             print >> sys.stderr, '{0} does not exist ...skipping '.format(path)
             return None
         p1, n1 = os.path.split(os.path.normpath(path))  # Avoid naive duplication
-        cmd = '''insert or ignore INTO {0} (path,name,state) VALUES ( ? , ? , ? )'''.format(self.label)
+        cmd = '''insert or ignore INTO transfer (path,name,state) VALUES ( ? , ? , ? )'''
         self.cs.execute(cmd, (p1, n1, 'RDY'))
         ret =  self.cs.lastrowid
         self.cs.connection.commit()
@@ -121,7 +128,7 @@ class DB:
 
     def status(self, reset=False, clear=False, clean=False):
         friendly = dict(DONE = 'Done',FAIL = 'Failed' , RDY = 'Ready' , WRK = 'Processing')
-        self.cs.execute('SELECT state,count(*),avg(end_time-start_time) from {0} group by state order by state'.format(self.label))
+        self.cs.execute('SELECT state,count(*),avg(end_time-start_time) from transfer group by state order by state' )
 
         retval = u'{:10s} |{:23s} |{:20s}\n'.format('State', 'Count', 'Average time in State')
         retval += '{:10s} |{:23s} |{:20s}\n'.format('-' * 10, '-' * 23, '-' * 20)
@@ -143,19 +150,19 @@ class DB:
         ### See if we need to reset the work queue
         try:
             if reset:
-                cmd = '''UPDATE "{0}"
+                cmd = '''UPDATE transfer
                             SET state = 'RDY', start_time=strftime('%s','now'), end_time = strftime('%s','now')
-                            WHERE STATE = 'FAIL' or 'STATE' = 'WRK' '''.format(self.label)
+                            WHERE STATE = 'FAIL' or 'STATE' = 'WRK' '''
                 self.cs.execute(cmd)
                 self.cs.connection.commit()
                 retval += u'\n\n    Failed and Processing values reset after.'
             if clean:
-                cmd = '''DELETE from "{0}" where state = 'DONE' '''.format(self.label)
+                cmd = '''DELETE from transfer where state = 'DONE' '''
                 self.cs.execute(cmd)
                 self.cs.connection.commit()
             if clear:
                 # Since sqlite doesn't have a truncate command, just drop the table -- it will be recreated if necessary
-                cmd = u'drop table "{0}"'.format(self.label)
+                cmd = u'drop table transfer'
                 self.cs.execute(cmd)
                 self.cs.connection.commit()
         except sqlite3.DatabaseError as e:

@@ -33,7 +33,7 @@ def mput_execute(app, arguments):
     dir_cache = _dirmgmt(size_limit=1024)
 
     client = app.get_client(arguments)
-    q, threads = thread_setup(NUM_THREADS, db.cnx, db.label, client, file_putter)
+    q, threads = thread_setup(NUM_THREADS, db.cnx,  client, file_putter)
 
     ctr = 0
     T0 = time.time()

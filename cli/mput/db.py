@@ -72,17 +72,12 @@ class DB:
                  UNIQUE ( path,name )
                   ) ''' )
         try:
-            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
             self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state_idx"  ON "transfer"(state) where state =  'DONE' ''' )
             self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state1_idx" ON "transfer"(state) where state <> 'DONE' ''')
             self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path_idx"   ON "transfer"(path) WHERE state = 'RDY' ''' )
-            self.cs.connection.commit()
-        except :
-            try: self.cnx.rollback()
-            except Exception as e : pass
-            self.cs.execute('CREATE INDEX IF NOT EXISTS t_state_idx ON transfer(state)' )
-            self.cs.execute('CREATE INDEX IF NOT EXISTS t_path1_idx ON transfer(path)' )
-            self.cs.connection.commit()
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
+        except Exception as e :
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS t_state_idx  ON transfer (state)''' )
 
 
     def update(self, rowid, state):

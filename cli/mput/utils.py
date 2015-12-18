@@ -21,7 +21,6 @@ limitations under the License.
 import os
 from collections import OrderedDict
 
-
 ### Pull paths from the database and put 'em ...
 class LimitedSizeDict(OrderedDict):
     def __init__(self, *args, **kwds):
@@ -40,16 +39,23 @@ class LimitedSizeDict(OrderedDict):
 
 
 class _dirmgmt(LimitedSizeDict):
+
     def __init__(self, *args, **kwds):
         LimitedSizeDict.__init__(self, *args, **kwds)
 
     def getdir(self, path, client):
+        """
+
+        :param path: basestring
+        :param client: IndigoClient
+        :return:
+        """
         if path in self: return True
         rq = client.get_cdmi(path + '/')
         if not rq.ok():
             p1, n1 = os.path.split(path)
             if p1 not in self:
                 self.getdir(p1, client)
-            client.mkdir(path)
+            client.mkdir(path+'/')
             self.set(path, True)
         return True

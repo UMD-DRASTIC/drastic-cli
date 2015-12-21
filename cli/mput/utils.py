@@ -38,33 +38,37 @@ class LimitedSizeDict(OrderedDict):
                 self.popitem(last=False)
 
 
-class _dirmgmt(LimitedSizeDict):
+class _dirmgmt(set):
 
     def __init__(self, *args, **kwds):
-        LimitedSizeDict.__init__(self, *args, **kwds)
+        from threading import Lock
+        super(_dirmgmt,self).__init__(self, *args )
+        self.lock =   Lock()
 
-    def getdir(self, path, client):
+    def  getdir(self,tgtdir, client) :
         """
-
         :param path: basestring
-        :param client: IndigoClient
         :return:
         """
-        if path in self: return True
-        rq = client.get_cdmi(path + '/')
-        if rq.ok():
-            self.set(path,True)
-            return True  ### OK
-        ######  Not there... ####
-        p1, n1 = os.path.split(path)
-        if p1 not in self:
-            ### Walk up the tree trying to create.
-            if self.getdir(p1, client) :
-                return True
-            else : raise RuntimeWarning('Failed to create path {}'.format(p1) )
-        ####
-        ret  = client.mkdir(path+'/')
-        if ret.ok() or ret.code == 409 :        # 409 is path exists... which is OK
-            self.set(path, True)
-            return True
-        return False
+        if tgtdir in self : return True
+        dirs = [  tgtdir[:] , ]             # initialize the directory stack
+        ### Then walk up the directory stack as far as necessary...
+        while dirs :
+            res = client.mkdir(dirs[-1])
+            if res.ok() :
+                tdir = dirs.pop()
+                # Update the cache -- safely
+                self.lock.acquire()
+                self.add(tdir)
+                self.lock.release()
+                continue
+
+            #### Go here if the mkdir failed... push the parent onto the stack and retry.
+            tdir,_ = os.path.split(tdir)
+            if tdir != '/' :
+                dirs.append(tdir)
+            else :
+                print "can't make directory {} or some of its parents".format(tgtdir)
+                return False
+
+        return True

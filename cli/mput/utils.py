@@ -52,10 +52,19 @@ class _dirmgmt(LimitedSizeDict):
         """
         if path in self: return True
         rq = client.get_cdmi(path + '/')
-        if not rq.ok():
-            p1, n1 = os.path.split(path)
-            if p1 not in self:
-                self.getdir(p1, client)
-            client.mkdir(path+'/')
+        if rq.ok():
+            self.set(path,True)
+            return True  ### OK
+        ######  Not there... ####
+        p1, n1 = os.path.split(path)
+        if p1 not in self:
+            ### Walk up the tree trying to create.
+            if self.getdir(p1, client) :
+                return True
+            else : raise RuntimeWarning('Failed to create path {}'.format(p1) )
+        ####
+        ret  = client.mkdir(path+'/')
+        if ret.ok() or ret.code == 409 :        # 409 is path exists... which is OK
             self.set(path, True)
-        return True
+            return True
+        return False

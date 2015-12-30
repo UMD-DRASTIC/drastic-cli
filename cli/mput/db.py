@@ -49,7 +49,7 @@ class DB:
             try:
                 os.mkdir(p)
             except Exception as e:
-                print 'cannot make directory {}'.format(p)
+                print '{}\n -- cannot make directory {} '.format(e,p)
                 raise
 
         # open or create the database
@@ -71,13 +71,19 @@ class DB:
                  end_time INTEGER ,
                  UNIQUE ( path,name )
                   ) ''' )
+
+        self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
         try:
+
             self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state_idx"  ON "transfer"(state) where state =  'DONE' ''' )
             self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_state1_idx" ON "transfer"(state) where state <> 'DONE' ''')
             self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path_idx"   ON "transfer"(path) WHERE state = 'RDY' ''' )
-            self.cs.execute('''CREATE INDEX IF NOT EXISTS "t_path1_idx"  ON "transfer"(path)   ''' )
         except Exception as e :
-            self.cs.execute('''CREATE INDEX IF NOT EXISTS t_state_idx  ON transfer (state)''' )
+            print e
+            print 'Falling back to full indexes ... you may wish to consider updating your version of sqlite'
+            self.cs.connection.rollback()
+            self.cs.execute('''CREATE INDEX IF NOT EXISTS t_state_idx  ON transfer (state)''' )     # Fallback to full  index if partial fails.
+        self.cs.connection.commit()
 
 
     def update(self, rowid, state):
@@ -101,16 +107,19 @@ class DB:
         """
         self.cs.execute('''BEGIN''')
         ## Select A Path's worth of files.... where some are
-        cmd = '''WITH DIR as ( SELECT path from transfer WHERE STATE = 'RDY' LIMIT 1)
+        cmd = '''WITH DIR as ( SELECT path from transfer WHERE STATE = 'RDY' order by path LIMIT 1)
                     SELECT path ,name,start_time,end_time,row_id from transfer JOIN DIR USING (path) where STATE = 'RDY'
             '''
         self.cs.execute(cmd)
         results = self.cs.fetchall()
+
         data = [data[-1:] for data in results]
         cmd = '''UPDATE transfer SET STATE = 'WRK' , start_time = strftime('%s','now') WHERE row_id = ?'''
         if data :
             self.cs.executemany(cmd,data)
             self.cs.connection.commit()
+        else :
+            self.cs.connection.rollback()
         # And unicode the results...
         return results
 
@@ -151,26 +160,25 @@ class DB:
             ### Done oddball fix
 
         ### See if we need to reset the work queue
-        try:
-            if reset:
-                cmd = '''UPDATE transfer
-                            SET state = 'RDY', start_time=strftime('%s','now'), end_time = strftime('%s','now')
-                            WHERE STATE = 'FAIL' or 'STATE' = 'WRK' '''
+        cmd = None
+        if reset:
+            cmd = ("""UPDATE transfer
+                        SET state = 'RDY', start_time=strftime('%s','now'), end_time = strftime('%s','now')
+                        WHERE STATE = 'FAIL' or 'STATE' = 'WRK'""")
+            retval += u'\n\n    Then resetting Failed and Processing values.'
+        if clean:
+            cmd = '''DELETE from transfer where state = 'DONE' '''
+        if clear:
+            # Since sqlite doesn't have a truncate command, just drop the table -- it will be recreated if necessary
+            cmd = u'drop table transfer'
+        #---
+        if cmd :
+            try:
                 self.cs.execute(cmd)
                 self.cs.connection.commit()
-                retval += u'\n\n    Failed and Processing values reset after.'
-            if clean:
-                cmd = '''DELETE from transfer where state = 'DONE' '''
-                self.cs.execute(cmd)
-                self.cs.connection.commit()
-            if clear:
-                # Since sqlite doesn't have a truncate command, just drop the table -- it will be recreated if necessary
-                cmd = u'drop table transfer'
-                self.cs.execute(cmd)
-                self.cs.connection.commit()
-        except sqlite3.DatabaseError as e:
-            print e
-            print 'Failed to process cmd -- \n{}\n'.format(cmd)
+            except sqlite3.DatabaseError as e:
+                print e
+                print 'Failed to process cmd -- \n{}\n'.format(cmd)
 
         # And now return the status
         return retval

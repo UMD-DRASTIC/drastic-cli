@@ -19,52 +19,54 @@ limitations under the License.
 """
 
 import os
-from collections import OrderedDict
+import time
 
 ### Pull paths from the database and put 'em ...
-class LimitedSizeDict(OrderedDict):
-    def __init__(self, *args, **kwds):
-        self.size_limit = kwds.pop("size_limit", 4096)
-        OrderedDict.__init__(self, *args, **kwds)
-        self._check_size_limit()
 
-    def set(self, key, value):
-        OrderedDict.__setitem__(self, key, value)
-        self._check_size_limit()
-
-    def _check_size_limit(self):
-        if self.size_limit is not None:
-            while len(self) > self.size_limit:
-                self.popitem(last=False)
-
+class counter_timer:
+    def __init__(self,label, enabled = True  ):
+        self.label = label
+        self.enabled = enabled
+    def __enter__(self):
+        if not self.enabled : return False
+        self.T0 = time.time()
+    def __exit__(self, exc_type, exc_value, traceback ):
+        if not self.enabled : return True
+        from sys import stderr
+        print >> stderr,"TRACE: {} : elapsed : {:0,.3f}s   ". format(self.label, time.time() - self.T0  )
+        return
 
 class _dirmgmt(set):
-
-    def __init__(self, *args, **kwds):
+    def __init__(self, *args ):
         from threading import Lock
-        super(_dirmgmt,self).__init__(self, *args )
+        set.__init__(self, *args )
         self.lock =   Lock()
 
     def  getdir(self,tgtdir, client) :
         """
-        :param path: basestring
+
+        :param tgtdir: basestring
+        :param client: IndigoClient
         :return:
         """
+
         if tgtdir in self : return True
         dirs = [  tgtdir[:] , ]             # initialize the directory stack
         ### Then walk up the directory stack as far as necessary...
         while dirs :
-            res = client.mkdir(dirs[-1])
-            if res.ok() :
-                tdir = dirs.pop()
-                # Update the cache -- safely
-                self.lock.acquire()
-                self.add(tdir)
-                self.lock.release()
-                continue
+            with counter_timer('mkdir_primitive') :
+                res = client.mkdir(dirs[-1])
+                if res.ok() :
+                    tdir = dirs.pop()
+                    # Update the cache -- safely
+                    self.lock.acquire()
+                    self.add(tdir)
+                    self.lock.release()
+                    continue
 
             #### Go here if the mkdir failed... push the parent onto the stack and retry.
-            tdir,_ = os.path.split(tdir)
+
+            tdir,_ = os.path.split( dirs[-1] )
             if tdir != '/' :
                 dirs.append(tdir)
             else :

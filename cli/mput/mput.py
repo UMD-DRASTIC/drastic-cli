@@ -24,7 +24,7 @@ import sys
 import time
 
 from .config import NUM_THREADS
-from .mput_threads import thread_setup, file_putter
+from .mput_threads import thread_setup, file_putter, file_putter_worker
 from .utils import _dirmgmt
 
 
@@ -71,16 +71,18 @@ def mput(app, arguments):
     ####
     client = app.get_client(arguments)
     tgtdir = arguments['<tgt-dir-in-repo>']
-    q, threads = thread_setup(NUM_THREADS, None, None, client)
-
-    ### Set up a directory name cache, so that we don't have to keep going back
+     ### Set up a directory name cache, so that we don't have to keep going back
     cache = _dirmgmt()
+
+    q, threads = thread_setup(NUM_THREADS, None,   client , cache = cache )
+
     ### Instrumentation
     t0 = time.time()
     t1 = t0
     ctr = 0
     ### Actual mput loop ###
     for path in _src:
+        ctr += 1
         tgtfile = os.path.join(tgtdir, path.strip('/'))
         n1, _ = os.path.split(tgtfile)
         if n1:
@@ -92,9 +94,9 @@ def mput(app, arguments):
 
         print "putting ", (path, tgtfile, None)
 
-        q.put((path, tgtfile, None))
+        q.put(tuple((path, tgtfile, None)))
         if NUM_THREADS == 0:
-            file_putter(q, client, None, None, one_shot=True)  # forced Serialization...
+            file_putter_worker(q, client,cache)  # forced Serialization for debugging...
 
     if NUM_THREADS > 0:
         q.join()

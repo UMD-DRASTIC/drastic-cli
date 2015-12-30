@@ -19,8 +19,8 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-import os
-
+import os.path
+import sys
 from .db import DB
 from .mput_threads import *
 
@@ -36,9 +36,9 @@ def mput_prepare(app, arguments):
     if arguments['--walk']:
         tree = arguments['<file-list>']
         if '~' in tree : tree = os.path.expanduser(tree)
-        if not tree or not os.path.isdir(tree):
-            raise ValueError("can't find the tree to walk ")
         tree = os.path.normpath(tree)
+        if not tree or not os.path.isdir(tree):
+            raise ValueError("can't find the tree to walk <{}>".format(tree))
 
         for dirname,_,files in os.walk(tree,topdown=True,followlinks=True) :
             for fn in files :

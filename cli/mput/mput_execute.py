@@ -18,58 +18,65 @@
     See the License for the specific language governing permissions and
     limitations under the License.
 """
-import os
+import os.path
 
 from .config import NUM_THREADS
 from .db import DB
 from .mput_threads import *
-from .utils import _dirmgmt
-
-
+from .utils import _dirmgmt, counter_timer
 
 def mput_execute(app, arguments):
     db = DB(app, arguments)
     tgt_prefix = arguments['<tgt-dir-in-repo>']
-    dir_cache = _dirmgmt(size_limit=1024)
+    dir_cache = _dirmgmt( )
 
     client = app.get_client(arguments)
-    q, threads = thread_setup(NUM_THREADS, db.cnx,  client, file_putter)
+    q, threads = thread_setup(NUM_THREADS, db.cnx,  client, file_putter, cache = dir_cache )
+    for t in threads : t.start()
 
-    ctr = 0
-    T0 = time.time()
-    T1 = T0
+    debug = arguments.get('-D',0)
+    debug = int(debug) if isinstance(debug,basestring) and debug.isdigit() else 0
+
+
     while True:
         thisdir = db.get_and_lock()
-        if not thisdir: break
-        ctr1 = 0
+        if not thisdir   :
+            break
         # Start by ensuring there is a container to go into...
         path = thisdir[0][0]
-        tgtdir = os.path.normpath(os.path.join(unicode(tgt_prefix), path.lstrip('/')))
-        try:
-            dir_cache.getdir(tgtdir, client)  # Load the path (and its parents) into the cache....
-        except Exception as e:
-            print e, path
-            continue
 
-        ### Now we know that the target dir exists... process all the files..
+        tgtdir = os.path.normpath(os.path.join(unicode(tgt_prefix), path.lstrip('/')))
+        ### This is now done in the threads...
+        if False:
+            if not dir_cache.getdir(tgtdir,client) :
+                 print "FAILED to create <{}> or one of its ancestors"
+                 continue
+
+        T0,N = time.time(),0            # instrumentation
         for path, name, start_time, end_time, row_id in thisdir:
-            ctr1 += 1
-            # Then actually putting the data ...
-            tgtname = os.path.join(tgtdir, name)
-            q.put((os.path.join(path, name), tgtname, row_id))
-            if NUM_THREADS == 0:
-                file_putter(q, client, db.cnx, db.label, one_shot=True)
-        ctr += ctr1
-        T2 = time.time()
-        print '{tgtdir} : {ctr1} files in {T21:.2f}s = {ctr1_T21:.2f}/sec , {ctr} total files in {T20:.2f} = {ctr_T20:.2}/sec'.format(
-            tgtdir=tgtdir, ctr=ctr, ctr1=ctr1, T20=T2 - T0, T21=T2 - T1, ctr1_T21=ctr1 / (T2 - T1),
-            ctr_T20=ctr / (T2 - T0)
-        )
-        T1 = T2
+            N += 1
+            # Queue up the put request to a thread...
+            q.put((os.path.join(path, name),  os.path.join(tgtdir ,name) , row_id))
+
+        if debug > 0 :
+            Tx = time.time() - T0
+            print "Time to queue {} items = {:.2f} [ {:,.3g} / sec ], qsize = {} ".format(N,Tx,N/Tx,q.qsize() )
     # Now wait for all the workers to finish
 
-    q.join()  # suspends until the queue is empty and all the workers have acknowledged completion
+    N,T0 = q.qsize(),time.time()
+    while True :
+        if N <= 1 : break
+        else :
+            time.sleep(1)
+            if debug > 1 :
+                N1 = q.qsize
+                T1 = time.time()
+                print "{} entries left, rate = {:,.2f}/sec".format(N1,(N-N1)/(T1-T0))
+                N,T0 = N1,T1
 
-    T2 = time.time()
-    print '{ctr} total files  in {T20} = {ctr_T20}/sec'.format(T20=T2 - T0, ctr=ctr, ctr_T20=ctr / (T2 - T0))
-    return ctr
+
+    try:
+        q.join()  # suspends until the queue is empty and all the workers have acknowledged completion
+    except Exception as e :
+        print e
+

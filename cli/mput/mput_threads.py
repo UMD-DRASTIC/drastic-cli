@@ -18,91 +18,103 @@ limitations under the License.
 
 """
 
-import sys
+import sqlite3
 import time
 from Queue import Queue
 from threading import Thread
 
+import os.path
 from requests import ConnectionError
 
-
-def file_putter(q, client, cnx,  one_shot=False):
+# Start
+# We have two functions, the outer one is just to manage the status of the operation in the database
+# the child function ( the worker ) actually puts the file
+#
+def file_putter(q, client, cnx, cache = None   ) :
     """
-    :param q: the queue from which src and target files will be called
-    :param client:  the client object that implements the various CDMI calls to the host
-    :param cnx: a database connection to update the file status on completion
-    :param label: the name of the table containing the work queue
+    Pull local (source) file and remote ( target ) object paths and send them, and then
+    update the database that tracks the files....
+
+    :param q: Queue
+    :param client:  IndigoClient
+    :param cnx: sqlite3.Connection  a database connection to update the file status on completion
+    :param cache: .utils._dirmgmt
+    :param logger_queue: Queue
     :return: N/A
     """
-    if cnx:
+    ### Set everything up ... primarily database connection
+    _stmt1 = '''UPDATE transfer SET state = ? ,start_time=? , end_time = ? Where row_id = ?'''
+    cs = None
+    if cnx :
+        if isinstance(cnx,basestring) :
+            cnx = sqlite3.connect(cnx)
+        if not isinstance(cnx,sqlite3.Connection) :
+            raise ValueError("don't know what to do with {} for database connection".format(cnx))
         cs = cnx.cursor()
-        stmt1 = '''UPDATE transfer SET state = ? ,start_time=? , end_time = ? Where row_id = ?'''
-
-    total_len = 0
+    ### Now loop on the queue entry ... which will continue until the parent thread 'joins'
     while True:
         src, target, row_id = q.get()
         T0 = time.time()
-        fail = False
-        with open(src, 'rb') as fh:
+        ret = file_putter_worker(src,target  , client,   cache =  cache )
+        T1 = time.time()
+
+        q.task_done()
+        if ret['ok'] : status = 'DONE'
+        else :
+            status = 'FAIL'
+            print ret['msg']
+
+        if cs :
             try:
-                from io import SEEK_CUR
-                res = client.put(target, fh)
-
-            except ConnectionError as e:
-                fail = True
-            except Exception as e:
-                print u'failed to put {} to {}'.format(src, target)
-                print e
-                # Since it wasn't a connection error abandon this one .. mark as failed.
-                fail = True
-
-            if fail:
-                T1 = time.time()
-                cs.execute(stmt1, ('FAIL', T0, T1, row_id))
+                cs.execute(_stmt1, (status, T0, T1, row_id))
                 cs.connection.commit()
-                q.task_done()
-                if one_shot:
-                    return
-                else:
-                    continue
-
-                    # The Put apparently succeeded...
-                    # total_len += fh.seek(0, SEEK_CUR)  #
-
-        if cnx and row_id:
-            T1 = time.time()
-            if res.ok():
-                cs.execute(stmt1, ('DONE', T0, T1, row_id))
-                cs.connection.commit()
-            else:
-                print >> sys.stderr, res.msg(), '\n', target
-                cs.execute(stmt1, ('FAIL', T0, T1, row_id))
-                cs.connection.commit()
-                q.put((src, target, row_id))  # Stick it back on and try later...
-        else:
-            if not res.ok():
-                print res.msg()
-                q.put((src, target, row_id))  # Stick it back on and try later...
-        q.task_done()  # Acknowledge that task has completed...
-        if one_shot:
-            return
+            except sqlite3.OperationalError as e :
+                pass
 
 
-def thread_setup(N, cnx, client, target=file_putter):
+def file_putter_worker(src, target , client, cache = None ):
+    """
+    :param src: basestring
+    :param target: basestring
+    :param client:  IndigoClient
+    :param cache: .util._dirmgmt
+    :return: N/A
     """
 
-    :param N: Number of worker threads...
-    :param cnx: databse connection object
-    :param label: name of work queue table, for use  in constructing SQL queries
-    :param client: the CDMI client object ... it appears to be thread safe,so no point in replicating it
-    :param target: the target path name on the server
+    ### Handle directory creation here...
+    ### Note that the cache object recursively creates containers... walking up the tree until it finds a container
+    ### and then walking down creating as it goes ...
+    ###
+    if cache is not None :                  # Cache may be empty, or it may be not present, so be precise.
+        tgtdir,nm = os.path.split(target)
+        if not cache.getdir(tgtdir, client):
+            return {'ok': False, 'msg': 'Failed to Create {} or one of its parents'.format(tgtdir)}
+
+    with open(src, 'rb') as fh:
+        try:
+            res = client.put(target, fh)
+            if res.ok() :  return {'ok' : True }
+        except ConnectionError as e:
+            return {'ok': False, 'msg': 'Connection Error'}
+        except Exception as e:
+            return {'ok': False, 'msg': u'failed to put {} to {} [{} / {}]'.format(src, target,type(e), e)}
+
+
+def thread_setup(N, cnx, client, target=file_putter , cache = None ):
+    """
+
+    :param N: int                           -- Number of worker threads...
+    :param cnx: sqlite3.Connection          -- database connection object
+    :param client: IndigoClient             -- the CDMI client object ... it appears to be thread safe,so no point in replicating it
+    :param target:                          -- function
+    :param cache:  _dirmgmt                 -- Cache of found filenames...
     :return: [ queue , [threads]  ]
     """
     q = Queue(4096)
     threads = []
-    for k in xrange(N):
-        t = Thread(target=target, args=(q, client, cnx,  False))
+    for k in range(N):
+        t = Thread(target=target, args=(q, client, cnx ,  cache ))
         t.setDaemon(True)
-        t.start()
+        #t.start()
         threads.append(t)
     return [q, threads]

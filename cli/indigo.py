@@ -1,3 +1,4 @@
+#!/usr/bin/python
 """Indigo Command Line Interface.
 
 Copyright 2015 Archive Analytics Solutions
@@ -47,7 +48,7 @@ Usage:
   indigo (-h | --help)
   indigo --version
   indigo mput-prepare [-l label] (--walk <file-list> | --read (<source-dir>|-))
-  indigo mput-execute [-l label] <tgt-dir-in-repo>
+  indigo mput-execute [-D <debug_level>] [-l label] <tgt-dir-in-repo>
   indigo mput --walk <source-dir>     <tgt-dir-in-repo>
   indigo mput --read (<file-list>|-)  <tgt-dir-in-repo>
   indigo mput-status [-l label] [--reset] [(--clear|--clean)]
@@ -60,6 +61,7 @@ Options:
   --reset       reset all 'in-progress' entries to 'ready' in the work queue
   --clear       remove all the entries in the workqueue
   --clean       remove all the 'DONE' entries in the workqueue
+  -D <debug_level>  trace/debug statements, integer >= 0  [ default: 0 ]
 
 
 Arguments:
@@ -87,9 +89,7 @@ from cli.acl import (
 )
 from cli.client import IndigoClient
 
-SESSION_PATH = os.path.join(os.path.expanduser('~/.indigo'),
-                            'session.pickle'
-                            )
+SESSION_PATH = os.path.join(os.path.expanduser('~/.indigo'),  'session.pickle'   )
 
 
 class IndigoApplication(object):

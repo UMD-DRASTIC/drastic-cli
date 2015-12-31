@@ -69,7 +69,7 @@ def mput_execute(app, arguments):
         else :
             time.sleep(1)
             if debug > 1 :
-                N1 = q.qsize
+                N1 = q.qsize()
                 T1 = time.time()
                 print "{} entries left, rate = {:,.2f}/sec".format(N1,(N-N1)/(T1-T0))
                 N,T0 = N1,T1

@@ -39,7 +39,7 @@ def mput_execute(app, arguments):
 
 
     while True:
-        thisdir = db.get_and_lock()
+        thisdir = db.get_and_lock()   ## get another directories worth of files
         if not thisdir   :
             break
         # Start by ensuring there is a container to go into...

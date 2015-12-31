@@ -24,14 +24,24 @@ from .config import NUM_THREADS
 from .db import DB
 from .mput_threads import *
 from .utils import _dirmgmt, counter_timer
+from Queue import  Empty
+
+
+def clear_db_queue(q,db) :
+    while True :
+            try:
+                row_id,state,T0,T1 =  q.get(block=False)
+                db.update(row_id,state)
+            except Empty:
+                return None
 
 def mput_execute(app, arguments):
     db = DB(app, arguments)
     tgt_prefix = arguments['<tgt-dir-in-repo>']
     dir_cache = _dirmgmt( )
-
+    db_queue = Queue(16*1024)
     client = app.get_client(arguments)
-    q, threads = thread_setup(NUM_THREADS, db.cnx,  client, file_putter, cache = dir_cache )
+    q, threads = thread_setup(NUM_THREADS, None if True else db.cnx  ,  client, file_putter, cache = dir_cache , db_queue = db_queue )
     for t in threads : t.start()
 
     debug = arguments.get('-D',0)
@@ -39,6 +49,8 @@ def mput_execute(app, arguments):
 
 
     while True:
+        clear_db_queue(db_queue,db)
+
         thisdir = db.get_and_lock()   ## get another directories worth of files
         if not thisdir   :
             break
@@ -58,16 +70,14 @@ def mput_execute(app, arguments):
             # Queue up the put request to a thread...
             q.put((os.path.join(path, name),  os.path.join(tgtdir ,name) , row_id))
 
-        if debug > 0 :
-            Tx = time.time() - T0
-            print "Time to queue {} items = {:.2f} [ {:,.3g} / sec ], qsize = {} ".format(N,Tx,N/Tx,q.qsize() )
     # Now wait for all the workers to finish
 
     N,T0 = q.qsize(),time.time()
     while True :
-        if N <= 1 : break
+        clear_db_queue(db_queue,db)
+        if q.qsize() < 1 : break
         else :
-            time.sleep(1)
+            time.sleep(3)
             if debug > 1 :
                 N1 = q.qsize()
                 T1 = time.time()
@@ -75,8 +85,14 @@ def mput_execute(app, arguments):
                 N,T0 = N1,T1
 
 
-    try:
-        q.join()  # suspends until the queue is empty and all the workers have acknowledged completion
-    except Exception as e :
-        print e
+    print 'Queue is empty',q.qsize()
+    ### Clear any remaining DB updates
+    clear_db_queue(db_queue,db)
+
+    q.join()  # suspends until the queue is empty and all the workers have acknowledged completion
+
+    clear_db_queue(db_queue,db)
+
+    print 'Done'
+
 

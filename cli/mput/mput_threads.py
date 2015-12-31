@@ -30,7 +30,7 @@ from requests import ConnectionError
 # We have two functions, the outer one is just to manage the status of the operation in the database
 # the child function ( the worker ) actually puts the file
 #
-def file_putter(q, client, cnx, cache = None   ) :
+def file_putter(q, client, cnx, cache = None , db_queue = None  ) :
     """
     Pull local (source) file and remote ( target ) object paths and send them, and then
     update the database that tracks the files....
@@ -63,8 +63,9 @@ def file_putter(q, client, cnx, cache = None   ) :
         else :
             status = 'FAIL'
             print ret['msg']
-
-        if cs :
+        if db_queue :
+            db_queue.put((row_id,status,T0,T1))
+        elif cs :
             try:
                 cs.execute(_stmt1, (status, T0, T1, row_id))
                 cs.connection.commit()
@@ -93,14 +94,16 @@ def file_putter_worker(src, target , client, cache = None ):
     with open(src, 'rb') as fh:
         try:
             res = client.put(target, fh)
-            if res.ok() :  return {'ok' : True }
+            if res.ok() :
+                print 'put ',str(target)
+                return {'ok' : True }
         except ConnectionError as e:
             return {'ok': False, 'msg': 'Connection Error'}
         except Exception as e:
             return {'ok': False, 'msg': u'failed to put {} to {} [{} / {}]'.format(src, target,type(e), e)}
 
 
-def thread_setup(N, cnx, client, target=file_putter , cache = None ):
+def thread_setup(N, cnx, client, target=file_putter , cache = None , db_queue = None  ):
     """
 
     :param N: int                           -- Number of worker threads...
@@ -113,7 +116,7 @@ def thread_setup(N, cnx, client, target=file_putter , cache = None ):
     q = Queue(4096)
     threads = []
     for k in range(N):
-        t = Thread(target=target, args=(q, client, cnx ,  cache ))
+        t = Thread(target=target, args=(q, client, cnx ,  cache , db_queue ))
         t.setDaemon(True)
         #t.start()
         threads.append(t)

@@ -59,10 +59,10 @@ def file_putter(q, client, cnx, cache = None , db_queue = None  ) :
         T1 = time.time()
 
         q.task_done()
-        if ret['ok'] : status = 'DONE'
+        if ret and ret['ok'] : status = 'DONE'
         else :
             status = 'FAIL'
-            print ret['msg']
+            if ret : print ret['msg']
         if db_queue :
             db_queue.put((row_id,status,T0,T1))
         elif cs :

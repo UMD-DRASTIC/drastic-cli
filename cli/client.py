@@ -16,6 +16,7 @@ limitations under the License.
 
 """
 
+
 import json
 import mimetypes
 import mmap
@@ -456,6 +457,8 @@ class IndigoClient(object):
         mypath = os.path.normpath(mypath)
         if path.endswith('/') and not mypath.endswith('/'):
             mypath += '/'
+        if isinstance(mypath, unicode):
+            mypath = mypath.encode('utf8')
         url = self.cdmi_url + pathname2url(mypath)
         return url
 

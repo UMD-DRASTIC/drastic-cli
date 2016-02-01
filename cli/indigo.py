@@ -29,6 +29,7 @@ Usage:
   indigo cd [<path>]
   indigo mkdir <path>
   indigo put <src> [<dest>] [--mimetype=<MIME>]
+  indigo put --ref <url> <dest>
   indigo get <src> [<dest>] [--force]
   indigo rm <path>
   indigo chmod <path> (read|write|null) <group>
@@ -77,8 +78,10 @@ import pickle
 import sys
 from getpass import getpass
 from operator import methodcaller
+import json
 
 import requests
+from requests.exceptions import ConnectionError
 from blessings import Terminal
 from docopt import docopt
 
@@ -379,10 +382,15 @@ class IndigoApplication(object):
             return errno.EEXIST
 
         client = self.get_client(args)
-        cfh = client.open(src)
-        if cfh.status_code == 404:
-            self.print_error("'{0}': No such object or container"
-                             "".format(src))
+        try:
+            cfh = client.open(src)
+            if cfh.status_code == 404:
+                self.print_error("'{0}': No such object or container"
+                                 "".format(src))
+                return 404
+        except ConnectionError as e:
+            self.print_error("'{0}': Redirection failed - Reference isn't accessible"
+                                 "".format(e.request.url, e.strerror))
             return 404
         lfh = open(localpath, 'wb')
         for chunk in cfh.iter_content(8192):
@@ -607,6 +615,8 @@ class IndigoApplication(object):
 
     def put(self, args):
         "Put a file to a path."
+        if args["--ref"]:
+            return self.put_reference(args)
         src = args['<src>']
         # Absolutize local path
         local_path = os.path.abspath(src)
@@ -628,6 +638,19 @@ class IndigoApplication(object):
                 print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
             else:
                 self.print_error(res.msg())
+
+    def put_reference(self, args):
+        "Create a reference at path dest with the url."
+        dest = args['<dest>']
+        url = args['<url>']
+        client = self.get_client(args)
+        data = json.dumps({"reference": url})
+        res = client.put_cdmi(dest, data)
+        if res.ok():
+            cdmi_info = res.json()
+            print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
+        else:
+            self.print_error(res.msg())
 
     def pwd(self, args):
         """Print working directory"""

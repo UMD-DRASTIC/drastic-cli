@@ -27,6 +27,7 @@ Usage:
   indigo pwd
   indigo ls [<path>] [-a]
   indigo cd [<path>]
+  indigo cdmi <path>
   indigo mkdir <path>
   indigo put <src> [<dest>] [--mimetype=<MIME>]
   indigo put --ref <url> <dest>
@@ -330,6 +331,23 @@ class IndigoApplication(object):
         else:
             self.print_error(res.msg())
 
+    def cdmi(self, args):
+        "Display cdmi information (dict) for a path."
+        client = self.get_client(args)
+        path = args['<path>']
+        res = client.get_cdmi(path)
+        if res.ok():
+            print "{} :".format(client.normalize_cdmi_url(path))
+            d = res.json()
+            for key, value in d.iteritems():
+                if key != "value":
+                    print "  - {0.bold}{1}{0.normal}: {2}".format(
+                        self.terminal,
+                        key,
+                        value)
+        else:
+            self.print_error(res.msg())
+
     def create_client(self, args):
         """Return a IndigoClient."""
         url = args['--url']
@@ -569,7 +587,7 @@ class IndigoApplication(object):
         val = args['<meta_value>']
         if val:
             # Remove a specific value
-            ex_val = metadata[attr]
+            ex_val = metadata.get(attr, None)
             if isinstance(ex_val, list):
                 # Remove all elements of teh list with value val
                 metadata[attr] = [x for x in ex_val if x != val]
@@ -760,6 +778,8 @@ def main():
         return app.ls(arguments)
     elif arguments['cd']:
         return app.cd(arguments)
+    elif arguments['cdmi']:
+        return app.cdmi(arguments)
     elif arguments['mkdir']:
         return app.mkdir(arguments)
     elif arguments['put']:

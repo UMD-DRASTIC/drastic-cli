@@ -72,7 +72,7 @@ class Response(object):
             return self._json
 
     def json(self):
-        """Return a full json message if weare sure we stored a json dict"""
+        """Return a full json message if we are sure we stored a json dict"""
         return self._json
 
     def __str__(self):
@@ -275,7 +275,7 @@ class IndigoClient(object):
             headers['Accept'] = CDMI_CONTAINER
         else:
             headers['Accept'] = CDMI_OBJECT
-        res = requests.get(req_url, headers=headers, auth=self.auth)
+        res = requests.get(req_url, headers=headers, auth=self.auth, allow_redirects=False)
         if res.status_code in [400, 401, 403]:
             return Response(res.status_code,
                             res.content)
@@ -290,6 +290,8 @@ class IndigoClient(object):
                 return self.get_cdmi(path + '/')
         elif res.status_code == 502:
             return Response(res.status_code, "Unable to connect")
+        elif res.status_code == 302:
+            return Response(0, res.json())
         try:
             return Response(0, res.json())
         except ValueError:

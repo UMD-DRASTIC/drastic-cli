@@ -56,6 +56,10 @@ Put a local file, with eventually a new name::
     ...
     indigo put <src> <dst>
 
+Create a reference object::
+
+    indigo put --ref <url> <dest>
+
 Provide the MIME type of the object (if not supplied ``indigo put`` will attempt
 to guess)::
 
@@ -68,6 +72,10 @@ Fetch a data object from the archive to a local file::
     indigo get <src> <dst>
 
     indigo get --force <src> # Overwrite an existing local file
+
+Get the CDMI json dict for an object or a container
+
+    indigo cdmi <path>
 
 Remove an object or a container::
 

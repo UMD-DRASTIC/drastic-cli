@@ -30,7 +30,7 @@ Usage:
   indigo cdmi <path>
   indigo mkdir <path>
   indigo put <src> [<dest>] [--mimetype=<MIME>]
-  indigo put --ref <url> <dest>
+  indigo put --ref <url> <dest> [--mimetype=<MIME>]
   indigo get <src> [<dest>] [--force]
   indigo rm <path>
   indigo chmod <path> (read|write|null) <group>
@@ -653,6 +653,7 @@ class IndigoApplication(object):
             res = client.put(dest, fh, mimetype=args["--mimetype"])
             if res.ok():
                 cdmi_info = res.json()
+                print cdmi_info
                 print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
             else:
                 self.print_error(res.msg())
@@ -662,7 +663,11 @@ class IndigoApplication(object):
         dest = args['<dest>']
         url = args['<url>']
         client = self.get_client(args)
-        data = json.dumps({"reference": url})
+        dict_data = {"reference": url}
+        if args["--mimetype"]:
+            dict_data['mimetype'] = args["--mimetype"]
+        data = json.dumps(dict_data)
+        print data
         res = client.put_cdmi(dest, data)
         if res.ok():
             cdmi_info = res.json()

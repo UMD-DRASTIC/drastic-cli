@@ -303,7 +303,7 @@ class IndigoClient(object):
         """Get information about a group.
 
         {
-            'id': group.id,            # str
+            'uuid': group.uuid,            # str
             'name': group.name,        # str
             'members': group.members   # list
         }
@@ -328,7 +328,7 @@ class IndigoClient(object):
         """Get information about a user.
 
         {
-            'id': user.id,                        # str
+            'uuid': user.uuid,                    # str
             'username': user.name,                # str
             'email': user.email,                  # str
             'administrator': user.administrator,  # bool

@@ -83,7 +83,7 @@ Remove an object or a container::
 
 Add or modify an ACL to an object or a container::
 
-    indigo chmod (read|write|null) <group>
+    indigo chmod <path> (read|write|null) <group>
 
 
 Advanced Use - Metadata

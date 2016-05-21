@@ -103,10 +103,25 @@ class IndigoApplication(object):
         self.terminal = Terminal()
         self.session_path = session_path
 
+    def admin_atg(self, args):
+        """Add user(s) to a group."""
+        client = self.get_client(args)
+        groupname = unicode(args['<name>'], "utf-8")
+        ls_user = args['<user>']
+        res = client.add_user_group(groupname, ls_user)
+        if res.ok():
+            self.print_success(res.msg())
+        else:
+            self.print_error(res.msg())
+            return res.code()
+
     def admin_lg(self, args):
         """List all groups or a specific group if the name is specified"""
         client = self.get_client(args)
-        name = args['<name>']
+        if args['<name>']:
+            name = unicode(args['<name>'], "utf-8")
+        else:
+            name = None
         if name:
             res = client.list_group(name)
             if not res.ok():
@@ -114,13 +129,13 @@ class IndigoApplication(object):
                 return res.code()
             group_info = res.json()
             members = ", ".join(group_info.get("members", []))
-            print "{0.bold}Group name{0.normal}: {1}".format(
+            print u"{0.bold}Group name{0.normal}: {1}".format(
                 self.terminal,
                 group_info.get("name", name))
-            print "{0.bold}Group id{0.normal}: {1}".format(
+            print u"{0.bold}Group id{0.normal}: {1}".format(
                 self.terminal,
-                group_info.get("id", ""))
-            print "{0.bold}Members{0.normal}: {1}".format(
+                group_info.get("uuid", ""))
+            print u"{0.bold}Members{0.normal}: {1}".format(
                 self.terminal,
                 members)
         else:
@@ -134,31 +149,34 @@ class IndigoApplication(object):
     def admin_lu(self, args):
         """List all users or a specific user if the name is specified"""
         client = self.get_client(args)
-        name = args['<name>']
+        if args['<name>']:
+            name = unicode(args['<name>'], "utf-8")
+        else:
+            name = None
         if name:
             res = client.list_user(name)
             if not res.ok():
                 self.print_error(res.msg())
                 return res.code()
             user_info = res.json()
-            groups = ", ".join([el['name']
-                                for el in user_info.get("groups", [])])
-            print "{0.bold}User name{0.normal}: {1}".format(
+            groups = u", ".join([el['name']
+                                 for el in user_info.get("groups", [])])
+            print u"{0.bold}User name{0.normal}: {1}".format(
                 self.terminal,
                 user_info.get("username", name))
-            print "{0.bold}Email{0.normal}: {1}".format(
+            print u"{0.bold}Email{0.normal}: {1}".format(
                 self.terminal,
                 user_info.get("email", ""))
-            print "{0.bold}User id{0.normal}: {1}".format(
+            print u"{0.bold}User id{0.normal}: {1}".format(
                 self.terminal,
-                user_info.get("id", ""))
-            print "{0.bold}Administrator{0.normal}: {1}".format(
+                user_info.get("uuid", ""))
+            print u"{0.bold}Administrator{0.normal}: {1}".format(
                 self.terminal,
                 user_info.get("administrator", False))
-            print "{0.bold}Active{0.normal}: {1}".format(
+            print u"{0.bold}Active{0.normal}: {1}".format(
                 self.terminal,
                 user_info.get("active", False))
-            print "{0.bold}Groups{0.normal}: {1}".format(
+            print u"{0.bold}Groups{0.normal}: {1}".format(
                 self.terminal,
                 groups)
         else:
@@ -176,9 +194,10 @@ class IndigoApplication(object):
             groupname = raw_input("Please enter the group name: ")
         else:
             groupname = args['<name>']
+        groupname = unicode(groupname, "utf-8")
         res = client.list_group(groupname)
         if res.ok():
-            self.print_error("Groupname {} already exists".format(groupname))
+            self.print_error(u"Groupname {} already exists".format(groupname))
             return 409          # Conflict
         res = client.create_group(groupname)
         if res.ok():
@@ -194,9 +213,10 @@ class IndigoApplication(object):
             username = raw_input("Please enter the user's username: ")
         else:
             username = args['<name>']
+        username = unicode(username, "utf-8")
         res = client.list_user(username)
         if res.ok():
-            self.print_error("Username {} already exists".format(username))
+            self.print_error(u"Username {} already exists".format(username))
             return 409          # Conflict
         admin = raw_input("Is this an administrator? [y/N] ")
         email = ""
@@ -219,12 +239,16 @@ class IndigoApplication(object):
         """Moduser a new user. Ask in the terminal if the value isn't
         provided"""
         client = self.get_client(args)
-        value = args['<value>']
+        value = unicode(args['<value>'], "utf-8")
+        name = unicode(args['<name>'], "utf-8")
         if not value:
-            while not value:
-                value = raw_input("Please enter the new value: ")
-            while not value:
-                value = getpass("Please enter the new password: ")
+            if args['password']:
+                while not value:
+                    value = getpass("Please enter the new password: ")
+            else:
+                while not value:
+                    value = raw_input("Please enter the new value: ")
+                value = unicode(args['<value>'], "utf-8")
         d = {}
         if args['email']:
             d['email'] = value
@@ -234,7 +258,7 @@ class IndigoApplication(object):
             d['active'] = value.lower() in ["true", "y", "yes"]
         elif args['password']:
             d['password'] = value
-        res = client.mod_user(args['<name>'], d)
+        res = client.mod_user(name, d)
         if res.ok():
             self.print_success(res.msg())
         else:
@@ -248,6 +272,7 @@ class IndigoApplication(object):
             groupname = raw_input("Please enter the group name: ")
         else:
             groupname = args['<name>']
+        groupname = unicode(args['<name>'], "utf-8")
         res = client.rm_group(groupname)
         if res.ok():
             self.print_success(res.msg())
@@ -262,19 +287,8 @@ class IndigoApplication(object):
             username = raw_input("Please enter the user's username: ")
         else:
             username = args['<name>']
+        username = unicode(username, "utf-8")
         res = client.rm_user(username)
-        if res.ok():
-            self.print_success(res.msg())
-        else:
-            self.print_error(res.msg())
-            return res.code()
-
-    def admin_atg(self, args):
-        """Add user(s) to a group."""
-        client = self.get_client(args)
-        groupname = args['<name>']
-        ls_user = args['<user>']
-        res = client.add_user_group(groupname, ls_user)
         if res.ok():
             self.print_success(res.msg())
         else:
@@ -285,6 +299,7 @@ class IndigoApplication(object):
         """Remove user(s) to a group."""
         client = self.get_client(args)
         groupname = args['<name>']
+        groupname = unicode(args['<name>'], "utf-8")
         ls_user = args['<user>']
         res = client.rm_user_group(groupname, ls_user)
         if res.ok():
@@ -293,11 +308,42 @@ class IndigoApplication(object):
             self.print_error(res.msg())
             return res.code()
 
+    def cd(self, args):
+        "Move into a different container."
+        client = self.get_client(args)
+        if args['<path>']:
+            path = unicode(args['<path>'], "utf-8")
+        else:
+            path = u"/"
+        res = client.chdir(path)
+        if res.ok():
+            # Save the client for future use
+            self.save_client(client)
+        else:
+            self.print_error(res.msg())
+
+    def cdmi(self, args):
+        "Display cdmi information (dict) for a path."
+        client = self.get_client(args)
+        path = unicode(args['<path>'], "utf-8")
+        res = client.get_cdmi(path)
+        if res.ok():
+            print "{} :".format(client.normalize_cdmi_url(path))
+            d = res.json()
+            for key, value in d.iteritems():
+                if key != "value":
+                    print u"  - {0.bold}{1}{0.normal}: {2}".format(
+                        self.terminal,
+                        key,
+                        value)
+        else:
+            self.print_error(res.msg())
+
     def chmod(self, args):
         "Add or remove ACE to a path."
         client = self.get_client(args)
-        path = args['<path>']
-        group = args['<group>']
+        path = unicode(args['<path>'], "utf-8")
+        group = unicode(args['<group>'], "utf-8")
         if args['read']:
             level = "read"
         elif args['write']:
@@ -309,7 +355,6 @@ class IndigoApplication(object):
                "aceflags": "CONTAINER_INHERIT, OBJECT_INHERIT",
                "acemask" : str_to_cdmi_str_acemask(level, False)}
         metadata = {"cdmi_acl" : [ace]}
-        
         res = client.put(path, metadata=metadata)
         if res.ok():
             self.print_success(res.msg())
@@ -319,34 +364,6 @@ class IndigoApplication(object):
             else:
                 self.print_error(res.msg())
             return res.code()
-
-    def cd(self, args):
-        "Move into a different container."
-        client = self.get_client(args)
-        path = args['<path>']
-        res = client.chdir(path)
-        if res.ok():
-            # Save the client for future use
-            self.save_client(client)
-        else:
-            self.print_error(res.msg())
-
-    def cdmi(self, args):
-        "Display cdmi information (dict) for a path."
-        client = self.get_client(args)
-        path = args['<path>']
-        res = client.get_cdmi(path)
-        if res.ok():
-            print "{} :".format(client.normalize_cdmi_url(path))
-            d = res.json()
-            for key, value in d.iteritems():
-                if key != "value":
-                    print "  - {0.bold}{1}{0.normal}: {2}".format(
-                        self.terminal,
-                        key,
-                        value)
-        else:
-            self.print_error(res.msg())
 
     def create_client(self, args):
         """Return a IndigoClient."""
@@ -377,11 +394,10 @@ class IndigoApplication(object):
 
     def get(self, args):
         "Fetch a data object from the archive to a local file."
-        src = args['<src>']
-        dest = args['<dest>']
+        src = unicode(args['<src>'], "utf-8")
         # Determine local filename
-        if dest:
-            localpath = dest
+        if args['<dest>']:
+            localpath = unicode(args['<dest>'], "utf-8")
         else:
             localpath = src.rsplit('/')[-1]
 
@@ -389,22 +405,22 @@ class IndigoApplication(object):
         if os.path.isfile(localpath):
             if not args['--force']:
                 self.print_error(
-                    "File '{0}' exists, --force option not used"
-                    "".format(localpath))
+                    u"File '{0}' exists, --force option not used"
+                     "".format(localpath))
                 return errno.EEXIST
         elif os.path.isdir(localpath):
-            self.print_error("'{0}' is a directory".format(localpath))
+            self.print_error(u"'{0}' is a directory".format(localpath))
             return errno.EISDIR
         elif os.path.exists(localpath):
-            self.print_error("'{0}'exists but not a file".format(localpath))
+            self.print_error(u"'{0}'exists but not a file".format(localpath))
             return errno.EEXIST
 
         client = self.get_client(args)
         try:
             cfh = client.open(src)
             if cfh.status_code == 404:
-                self.print_error("'{0}': No such object or container"
-                                 "".format(src))
+                self.print_error(u"'{0}': No such object or container"
+                                  "".format(src))
                 return 404
         except ConnectionError as e:
             self.print_error("'{0}': Redirection failed - Reference isn't accessible"
@@ -442,8 +458,14 @@ class IndigoApplication(object):
         Optionally log in using HTTP Basic username and password credentials.
         """
         client = self.get_client(args)
-        username = args['--username']
-        password = args['--password']
+        if args['--username']:
+            username = unicode(args['--username'], "utf-8")
+        else:
+            username = None
+        if args['--password']:
+            password = unicode(args['--password'], "utf-8")
+        else:
+            password = None
         if username:
             if not password:
                 # Request password from interactive prompt
@@ -451,12 +473,12 @@ class IndigoApplication(object):
 
             res = client.authenticate(username, password)
             if res.ok():
-                print ("{0.bold_green}Success{0.normal} - {1} as "
+                print (u"{0.bold_green}Success{0.normal} - {1} as "
                        "{0.bold}{2}{0.normal}".format(self.terminal,
                                                       res.msg(),
                                                       username))
             else:
-                print "{0.bold_red}Failed{0.normal} - {1}".format(
+                print u"{0.bold_red}Failed{0.normal} - {1}".format(
                     self.terminal,
                     res.msg())
                 # Failed to log in
@@ -472,14 +494,21 @@ class IndigoApplication(object):
     def ls(self, args):
         """List a container."""
         client = self.get_client(args)
-        path = args['<path>']
+        if args['<path>']:
+            path = unicode(args['<path>'], "utf-8")
+        else:
+            path = None
         res = client.ls(path)
         if res.ok():
             cdmi_info = res.json()
-            if not path:
-                print "Root:"
+            pwd = client.pwd()
+            if path == None:
+                if pwd == "/":
+                    print "Root:"
+                else:
+                    print u"{}:".format(pwd)
             else:
-                print "{}:".format(path)
+                print u"{}{}:".format(pwd, path)
             # Display Acl
             if args['-a']:
                 metadata = cdmi_info.get("metadata", {})
@@ -513,7 +542,9 @@ class IndigoApplication(object):
     def meta_add(self, args, replace=False):
         """Add metadata"""
         client = self.get_client(args)
-        path = args['<path>']
+        path = unicode(args['<path>'], "utf-8")
+        meta_name = unicode(args['<meta_name>'], "utf-8")
+        meta_value = unicode(args['<meta_value>'], "utf-8")
         if path == '.' or path == './':
             path = client.pwd()
         res = client.get_cdmi(path)
@@ -522,20 +553,18 @@ class IndigoApplication(object):
             return res.code()
         cdmi_info = res.json()
         metadata = cdmi_info['metadata']
-        attr = args['<meta_name>']
-        val = args['<meta_value>']
-        if attr in metadata:
+        if meta_name in metadata:
             if replace:
-                metadata[attr] = val
+                metadata[meta_name] = meta_value
             else:
                 try:
                     # Already a list, we add it
-                    metadata[attr].append(val)
+                    metadata[meta_name].append(meta_value)
                 except AttributeError:
                     # Only 1 element, we create a list
-                    metadata[attr] = [metadata[attr], val]
+                    metadata[meta_name] = [metadata[meta_name], meta_value]
         else:
-            metadata[attr] = val
+            metadata[meta_name] = meta_value
         res = client.put(path, metadata=metadata)
         if not res.ok():
             self.print_error(res.msg())
@@ -544,7 +573,11 @@ class IndigoApplication(object):
     def meta_ls(self, args):
         """List metadata"""
         client = self.get_client(args)
-        path = args['<path>']
+        path = unicode(args['<path>'], "utf-8")
+        if args['<meta_name>']:
+            meta_name = unicode(args['<meta_name>'], "utf-8")
+        else:
+            meta_name = None
         if path == '.' or path == './':
             path = client.pwd()
         res = client.get_cdmi(path)
@@ -552,12 +585,12 @@ class IndigoApplication(object):
             self.print_error(res.msg())
             return res.code()
         cdmi_info = res.json()
-        if args['<meta_name>']:
+        if meta_name:
             # List 1 field
-            if args['<meta_name>'] in cdmi_info['metadata']:
-                print('{0}:{1}'.format(
-                    args['<meta_name>'],
-                    cdmi_info['metadata'][args['<meta_name>']]))
+            if meta_name in cdmi_info['metadata']:
+                print(u'{0}:{1}'.format(
+                    meta_name,
+                    cdmi_info['metadata'][meta_name]))
         else:
             # List everything
             for attr, val in cdmi_info['metadata'].iteritems():
@@ -567,14 +600,19 @@ class IndigoApplication(object):
                     continue
                 if isinstance(val, list):
                     for v in val:
-                        print '{0}:{1}'.format(attr, v)
+                        print u'{0}:{1}'.format(attr, v)
                 else:
-                    print '{0}:{1}'.format(attr, val)
+                    print u'{0}:{1}'.format(attr, val)
 
     def meta_rm(self, args):
         """Remove metadata"""
         client = self.get_client(args)
-        path = args['<path>']
+        path = unicode(args['<path>'], "utf-8")
+        meta_name = unicode(args['<meta_name>'], "utf-8")
+        if args['<meta_value>']:
+            meta_value = unicode(args['<meta_value>'], "utf-8")
+        else:
+            meta_value = None
         if path == '.' or path == './':
             path = client.pwd()
         res = client.get_cdmi(path)
@@ -583,21 +621,19 @@ class IndigoApplication(object):
             return res.code()
         cdmi_info = res.json()
         metadata = cdmi_info['metadata']
-        attr = args['<meta_name>']
-        val = args['<meta_value>']
-        if val:
+        if meta_value:
             # Remove a specific value
-            ex_val = metadata.get(attr, None)
+            ex_val = metadata.get(meta_name, None)
             if isinstance(ex_val, list):
                 # Remove all elements of teh list with value val
-                metadata[attr] = [x for x in ex_val if x != val]
-            elif ex_val == val:
+                metadata[meta_name] = [x for x in ex_val if x != meta_value]
+            elif ex_val == meta_value:
                 # Remove a single element if that's the one we wanted to
                 # remove
-                del metadata[attr]
+                del metadata[meta_name]
         else:
             try:
-                del metadata[attr]
+                del metadata[meta_name]
             except KeyError:
                 # Metadata not defined
                 pass
@@ -609,37 +645,53 @@ class IndigoApplication(object):
     def mkdir(self, args):
         "Create a new container."
         client = self.get_client(args)
-        path = args['<path>']
+        path = unicode(args['<path>'], "utf-8")
         if not path.startswith("/"):
             # relative path
-            path = "{}{}".format(client.pwd(), path)
+            path = u"{}{}".format(client.pwd(), path)
         res = client.mkdir(path)
         if not res.ok():
             self.print_error(res.msg())
 
+    def mput(self, arguments):
+        import mput
+        return mput.mput(self,arguments)
+
+    def mput_execute(self,arguments):
+        import mput
+        return mput.mput_execute(self, arguments)
+
+    def mput_prepare(self,arguments):
+        import mput
+        return mput.mput_prepare(self, arguments)
+
+    def mput_status(self,arguments):
+        import mput
+        return mput.mput_status(self, arguments)
+
     def print_error(self, msg):
         """Display an error message."""
-        print "{0.bold_red}Error{0.normal} - {1}".format(self.terminal,
-                                                         msg)
+        print u"{0.bold_red}Error{0.normal} - {1}".format(self.terminal,
+                                                          msg)
 
     def print_success(self, msg):
         """Display a success message."""
-        print "{0.bold_green}Success{0.normal} - {1}".format(self.terminal,
-                                                             msg)
+        print u"{0.bold_green}Success{0.normal} - {1}".format(self.terminal,
+                                                              msg)
 
     def print_warning(self, msg):
         """Display a warning message."""
-        print "{0.bold_blue}Warning{0.normal} - {1}".format(self.terminal, msg)
+        print u"{0.bold_blue}Warning{0.normal} - {1}".format(self.terminal, msg)
 
     def put(self, args):
         "Put a file to a path."
         if args["--ref"]:
             return self.put_reference(args)
-        src = args['<src>']
+        src = unicode(args['<src>'], "utf-8")
         # Absolutize local path
         local_path = os.path.abspath(src)
         if args['<dest>']:
-            dest = args['<dest>']
+            dest = unicode(args['<dest>'], "utf-8")
         else:
             # PUT to same name in pwd on server
             dest = os.path.basename(local_path)
@@ -653,21 +705,19 @@ class IndigoApplication(object):
             res = client.put(dest, fh, mimetype=args["--mimetype"])
             if res.ok():
                 cdmi_info = res.json()
-                print cdmi_info
                 print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
             else:
                 self.print_error(res.msg())
 
     def put_reference(self, args):
         "Create a reference at path dest with the url."
-        dest = args['<dest>']
+        dest = unicode(args['<dest>'], "utf-8")
         url = args['<url>']
         client = self.get_client(args)
         dict_data = {"reference": url}
         if args["--mimetype"]:
             dict_data['mimetype'] = args["--mimetype"]
         data = json.dumps(dict_data)
-        print data
         res = client.put_cdmi(dest, data)
         if res.ok():
             cdmi_info = res.json()
@@ -685,7 +735,7 @@ class IndigoApplication(object):
 
         If we forget the trailing '/' for a collection we try to add it.
         """
-        path = args['<path>']
+        path = unicode(args['<path>'], "utf-8")
         client = self.get_client(args)
         res = client.delete(path)
         if res.code() == 404:
@@ -694,14 +744,14 @@ class IndigoApplication(object):
             res = client.get_cdmi(path + "/")
             if not res.ok():
                 # It really does not exist!
-                self.print_error(("Cannot remove '{0}': "
-                                  "No such object or container)"
-                                  "".format(path)))
+                self.print_error((u"Cannot remove '{0}': "
+                                   "No such object or container)"
+                                   "".format(path)))
                 return 404
             cdmi_info = res.json()
             # Fixup path and recursively call this function (rm)
-            args['<path>'] = "{}{}".format(cdmi_info['parentURI'],
-                                           cdmi_info['objectName'])
+            args['<path>'] = u"{}{}".format(cdmi_info['parentURI'],
+                                            cdmi_info['objectName'])
             return self.rm(args)
 
     def save_client(self, client):
@@ -716,22 +766,6 @@ class IndigoApplication(object):
         """Print name of the user"""
         client = self.get_client(args)
         print client.whoami() + " - " + client.url
-
-    def mput(self, arguments):
-        import mput
-        return mput.mput(self,arguments)
-
-    def mput_prepare(self,arguments):
-        import mput
-        return mput.mput_prepare(self, arguments)
-
-    def mput_execute(self,arguments):
-        import mput
-        return mput.mput_execute(self, arguments)
-
-    def mput_status(self,arguments):
-        import mput
-        return mput.mput_status(self, arguments)
 
 
 def main():

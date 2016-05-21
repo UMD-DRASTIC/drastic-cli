@@ -135,22 +135,22 @@ class IndigoClient(object):
 
         """
         if not path:
-            path = "/"
+            path = u"/"
         elif not path.endswith("/"):
-            path = "{}/".format(path)
+            path = u"{}/".format(path)
         res = self.get_cdmi(path)
         if res.ok():
             cdmi_info = res.json()
             # Check that object is a container
             if not cdmi_info['objectType'] == CDMI_CONTAINER:
                 return Response(406,
-                                "{0} isn't a container".format(path))
-            if cdmi_info['parentURI'] == "null":
+                                u"{0} isn't a container".format(path))
+            if cdmi_info['parentURI'] == "/" and cdmi_info['objectName'] == "Home":
                 # root
-                self._pwd = "/"
+                self._pwd = u"/"
             else:
-                self._pwd = "{}{}/".format(cdmi_info['parentURI'],
-                                           cdmi_info['objectName'])
+                self._pwd = u"{}{}/".format(cdmi_info['parentURI'],
+                                            cdmi_info['objectName'])
             return Response(0, "ok")
         else:
             return res
@@ -167,7 +167,7 @@ class IndigoClient(object):
         data = {"groupname": groupname,
                 "add_users": ls_user}
         headers = {'user-agent': self.u_agent}
-        req_url = self.normalize_admin_url("groups/{}".format(groupname))
+        req_url = self.normalize_admin_url(u"groups/{}".format(groupname))
         res = requests.put(req_url, headers=headers, auth=self.auth,
                            data=json.dumps(data))
         if res.status_code in [200, 201, 206]:
@@ -189,7 +189,7 @@ class IndigoClient(object):
         res = requests.post(req_url, headers=headers, auth=self.auth,
                             data=json.dumps(data))
         if res.status_code == 201:
-            return Response(0, "Group {} has been created".format(groupname))
+            return Response(0, u"Group {} has been created".format(groupname))
         else:
             return Response(res.status_code, res)
 
@@ -213,7 +213,7 @@ class IndigoClient(object):
         res = requests.post(req_url, headers=headers, auth=self.auth,
                             data=json.dumps(data))
         if res.status_code == 201:
-            return Response(0, "User {} has been created".format(username))
+            return Response(0, u"User {} has been created".format(username))
         else:
             return Response(res.status_code, res)
 
@@ -283,7 +283,7 @@ class IndigoClient(object):
             if path.endswith('/'):
                 # We remove the trailing '/' in the message
                 path = path[:-1]
-                msg = "Cannot access '{0}': No such container".format(path)
+                msg = u"Cannot access '{0}': No such container".format(path)
                 return Response(res.status_code, msg)
             else:
                 # Resource doesn't exist, we check if that's a container
@@ -313,7 +313,7 @@ class IndigoClient(object):
         :rtype: dict
 
         """
-        return self.get_admin("groups/{}".format(groupname))
+        return self.get_admin(u"groups/{}".format(groupname))
 
     def list_groups(self):
         """Get a list of existing groups.
@@ -341,7 +341,7 @@ class IndigoClient(object):
         :rtype: dict
 
         """
-        return self.get_admin("users/{}".format(username))
+        return self.get_admin(u"users/{}".format(username))
 
     def list_users(self):
         """Get a list of existing users.
@@ -384,7 +384,7 @@ class IndigoClient(object):
         if not path:
             path = self.pwd()
         elif not path.endswith("/"):
-            path = "{}/".format(path)
+            path = u"{}/".format(path)
         return self.get_cdmi(path)
 
     def mkdir(self, path):
@@ -422,11 +422,11 @@ class IndigoClient(object):
 
         """
         headers = {'user-agent': self.u_agent}
-        req_url = self.normalize_admin_url("users/{}".format(username))
+        req_url = self.normalize_admin_url(u"users/{}".format(username))
         res = requests.put(req_url, headers=headers, auth=self.auth,
                            data=json.dumps(data))
         if res.status_code == 200:
-            return Response(0, "User {} has been modified".format(username))
+            return Response(0, u"User {} has been modified".format(username))
         else:
             return Response(res.status_code, res)
 
@@ -526,10 +526,10 @@ class IndigoClient(object):
 
         """
         headers = {'user-agent': self.u_agent}
-        req_url = self.normalize_admin_url("groups/{}".format(groupname))
+        req_url = self.normalize_admin_url(u"groups/{}".format(groupname))
         res = requests.delete(req_url, headers=headers, auth=self.auth)
         if res.status_code == 200:
-            return Response(0, "Group {} has been removed".format(groupname))
+            return Response(0, u"Group {} has been removed".format(groupname))
         else:
             return Response(res.status_code, res)
 
@@ -542,10 +542,10 @@ class IndigoClient(object):
 
         """
         headers = {'user-agent': self.u_agent}
-        req_url = self.normalize_admin_url("users/{}".format(username))
+        req_url = self.normalize_admin_url(u"users/{}".format(username))
         res = requests.delete(req_url, headers=headers, auth=self.auth)
         if res.status_code == 200:
-            return Response(0, "User {} has been removed".format(username))
+            return Response(0, u"User {} has been removed".format(username))
         else:
             return Response(res.status_code, res)
 
@@ -561,7 +561,7 @@ class IndigoClient(object):
         data = {"groupname": groupname,
                 "rm_users": ls_user}
         headers = {'user-agent': self.u_agent}
-        req_url = self.normalize_admin_url("groups/{}".format(groupname))
+        req_url = self.normalize_admin_url(u"groups/{}".format(groupname))
         res = requests.put(req_url, headers=headers, auth=self.auth,
                            data=json.dumps(data))
         if res.status_code in [200, 206]:
@@ -674,4 +674,5 @@ class IndigoClient(object):
             # PUT the data in non-CDMI to avoid unnecessary base64 overhead
             #req_url = self.normalize_cdmi_url(path)
             self.put_http(path, data, mimetype)
-            return self.get_cdmi(os.path.split(path)[0])
+            #return self.get_cdmi(os.path.split(path)[0])
+            return self.get_cdmi(path)

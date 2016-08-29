@@ -638,13 +638,15 @@ class IndigoClient(object):
                 else:
                     mimetype = type_
         # Deal with varying data type
+        # from requests.packages.urllib3.response import HTTPResponse
         if isinstance(data, dict):
             data = json.dumps(data)
         elif isinstance(data, unicode):
             data = data.encode('utf-8')
-        elif isinstance(data, requests.packages.urllib3.response.HTTPResponse):
+        elif "HTTPResponse" == data.__class__.__name__:
             # This indicates that the data is a streamed HTTP response from another site.
-            pass
+            from requests_toolbelt.streaming_iterator import StreamingIterator
+            data = StreamingIterator(data.len, data)
         elif not isinstance(data, (mmap.mmap, basestring)):
             # Read the file-like object as a memory mapped string. Looks like
             # a string, but accesses the file directly. This avoids reading

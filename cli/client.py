@@ -1,20 +1,7 @@
-"""Indigo CDMI API Client.
-
-Copyright 2014 Archive Analytics Solutions
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+"""Drastic CDMI API Client.
 """
+__copyright__ = "Copyright (C) 2016 University of Maryland"
+__license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
 
 
 import json
@@ -79,14 +66,14 @@ class Response(object):
         return "({}, {})".format(self._code, self._json)
 
 
-class IndigoClient(object):
-    """A client to an Indigo archive. Communicate with the archive through HTTP
+class DrasticClient(object):
+    """A client to an Drastic archive. Communicate with the archive through HTTP
     REST Api (CDMI for the archive and a simple one for admin operations)"""
 
     def __init__(self, url):
         """Create a new instance of ``CDMIClient``.
 
-        :arg url: base url of the Indigo archive ("http://127.0.0.1")
+        :arg url: base url of the Drastic archive ("http://127.0.0.1")
 
         """
         self.url = url
@@ -95,7 +82,7 @@ class IndigoClient(object):
         # pwd should always end with a /
         self._pwd = '/'
         self.auth = None
-        self.u_agent = 'Indigo Client {0}'.format(cli.__version__)
+        self.u_agent = 'Drastic Client {0}'.format(cli.__version__)
 
     def authenticate(self, username, password):
         """Authenticate the client with ``username`` and ``password``.
@@ -592,7 +579,7 @@ class IndigoClient(object):
 
         """
         req_url = self.normalize_cdmi_url(path)
-        headers = {'user-agent': 'Indigo Client {0}'.format(cli.__version__),
+        headers = {'user-agent': 'Drastic Client {0}'.format(cli.__version__),
                    'Accept': "application/octet-stream"}
         return requests.get(req_url,
                             headers=headers,

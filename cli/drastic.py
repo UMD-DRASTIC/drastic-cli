@@ -1,77 +1,9 @@
 #!/usr/bin/python
-"""Indigo Command Line Interface.
-
-Copyright 2015 Archive Analytics Solutions
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-
+"""Drastic Command Line Interface.
 """
+__copyright__ = "Copyright (C) 2016 University of Maryland"
+__license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
 
-__doc_opt__ = """
-Indigo Command Line Interface.
-
-Usage:
-  indigo init --url=<URL> [--username=<USER>] [--password=<PWD>]
-  indigo whoami
-  indigo exit
-  indigo pwd
-  indigo ls [<path>] [-a]
-  indigo cd [<path>]
-  indigo cdmi <path>
-  indigo mkdir <path>
-  indigo put <src> [<dest>] [--mimetype=<MIME>]
-  indigo put --ref <url> <dest> [--mimetype=<MIME>]
-  indigo get <src> [<dest>] [--force]
-  indigo rm <path>
-  indigo chmod <path> (read|write|null) <group>
-  indigo meta add <path> <meta_name> <meta_value>
-  indigo meta set <path> <meta_name> <meta_value>
-  indigo meta rm <path> <meta_name> [<meta_value>]
-  indigo meta ls <path> [<meta_name>]
-  indigo admin lu [<name>]
-  indigo admin lg [<name>]
-  indigo admin mkuser [<name>]
-  indigo admin moduser <name> (email | administrator | active | password) [<value>]
-  indigo admin rmuser [<name>]
-  indigo admin mkgroup [<name>]
-  indigo admin rmgroup [<name>]
-  indigo admin atg <name> <user> ...
-  indigo admin rtg <name> <user> ...
-  indigo (-h | --help)
-  indigo --version
-  indigo mput-prepare [-l label] (--walk <file-list> | --read (<source-dir>|-))
-  indigo mput-execute [-D <debug_level>] [-l label] <tgt-dir-in-repo>
-  indigo mput --walk <source-dir>     <tgt-dir-in-repo>
-  indigo mput --read (<file-list>|-)  <tgt-dir-in-repo>
-  indigo mput-status [-l label] [--reset] [(--clear|--clean)]
-
-Options:
-  -h --help     Show this screen.
-  --version     Show version.
-  --url=<URL>   Location of Indigo server
-  -l --label    a label to have multiple prepares and executes simultaneously [  default: transfer ]
-  --reset       reset all 'in-progress' entries to 'ready' in the work queue
-  --clear       remove all the entries in the workqueue
-  --clean       remove all the 'DONE' entries in the workqueue
-  -D <debug_level>  trace/debug statements, integer >= 0  [ default: 0 ]
-
-
-Arguments:
-  <tgt-dir-in-repo>    where to place the files when you inject them [ default: / ]
-
-
-
-"""
 
 import errno
 import os
@@ -91,12 +23,12 @@ from cli.acl import (
     cdmi_str_to_str_acemask,
     str_to_cdmi_str_acemask
 )
-from cli.client import IndigoClient
+from cli.client import DrasticClient
 
-SESSION_PATH = os.path.join(os.path.expanduser('~/.indigo'),  'session.pickle'   )
+SESSION_PATH = os.path.join(os.path.expanduser('~/.drastic'),  'session.pickle'   )
 
 
-class IndigoApplication(object):
+class DrasticApplication(object):
     """Methods for the CLI"""
 
     def __init__(self, session_path):
@@ -366,13 +298,13 @@ class IndigoApplication(object):
             return res.code()
 
     def create_client(self, args):
-        """Return a IndigoClient."""
+        """Return a DrasticClient."""
         url = args['--url']
         if not url:
             # Called without being connected
             self.print_error("You need to be connected to access the server.")
             sys.exit(-1)
-        client = IndigoClient(url)
+        client = DrasticClient(url)
         # Test for client connection errors here
         res = client.get_cdmi('/')
         if res.code() in [0, 401, 403]:
@@ -433,9 +365,9 @@ class IndigoApplication(object):
         print localpath
 
     def get_client(self, args):
-        """Return a IndigoClient.
+        """Return a DrasticClient.
 
-        This may be achieved by loading a IndigoClient with a previously saved
+        This may be achieved by loading a DrasticClient with a previously saved
         session.
         """
         try:
@@ -443,11 +375,11 @@ class IndigoApplication(object):
             with open(self.session_path, 'rb') as fh:
                 client = pickle.load(fh)
         except (IOError, pickle.PickleError):
-            # Init a new IndigoClient
+            # Init a new DrasticClient
             client = self.create_client(args)
         if args['--url']:
             if client.url != args['--url']:
-                # Init a fresh IndigoClient
+                # Init a fresh DrasticClient
                 client = self.create_client(args)
         client.session = requests.Session()
         return client
@@ -595,7 +527,7 @@ class IndigoApplication(object):
             # List everything
             for attr, val in cdmi_info['metadata'].iteritems():
                 if attr.startswith(('cdmi_',
-                                    'com.archiveanalytics.indigo_')):
+                                    'com.archiveanalytics.drastic_')):
                     # Ignore non-user defined metadata
                     continue
                 if isinstance(val, list):
@@ -755,7 +687,7 @@ class IndigoApplication(object):
             return self.rm(args)
 
     def save_client(self, client):
-        """Save the status of the IndigoClient for subsequent use."""
+        """Save the status of the DrasticClient for subsequent use."""
         if not os.path.exists(os.path.dirname(self.session_path)):
             os.makedirs(os.path.dirname(self.session_path))
         # Load existing session, so as to keep current dir etc.
@@ -771,8 +703,8 @@ class IndigoApplication(object):
 def main():
     """Main function"""
     arguments = docopt(__doc_opt__,
-                       version='Indigo CLI {}'.format(cli.__version__))
-    app = IndigoApplication(SESSION_PATH)
+                       version='Drastic CLI {}'.format(cli.__version__))
+    app = DrasticApplication(SESSION_PATH)
 
     if arguments['init']:
         return app.init(arguments)

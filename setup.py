@@ -56,9 +56,9 @@ setup(
     install_requires=_install_requires,
     long_description=_long_description,
     author='Archive Analytics',
-    maintainer_email='@archiveanalytics.com',
-    license="Apache License, Version 2.0",
-    url='https://bitbucket.org/archiveanalytics/drastic-cli',
+    maintainer_email='jansen@umd.edu',
+    license="GNU AFFERO GENERAL PUBLIC LICENSE, Version 3",
+    url='https://github.com/UMD-DRASTIC/drastic-cli',
     setup_requires=['setuptools-git'],
     entry_points={
         'console_scripts': [
@@ -67,7 +67,7 @@ setup(
     },
     classifiers=[
         "Development Status :: 4 - Beta",
-        "License :: OSI Approved :: Apache Software License",
+        "License :: OSI Approved :: GNU Affero General Public License v3",
         "Programming Language :: Python :: 2.7",
         "Topic :: Internet :: WWW/HTTP :: WSGI",
         "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",

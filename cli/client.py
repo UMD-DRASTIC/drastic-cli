@@ -9,7 +9,10 @@ import mimetypes
 import mmap
 import os
 from base64 import b64encode
-from urllib import pathname2url, url2pathname
+try:
+    from urllib import pathname2url, url2pathname
+except ImportError:
+    from urllib.request import pathname2url, url2pathname
 
 import requests
 

@@ -3,7 +3,61 @@
 """
 __copyright__ = "Copyright (C) 2016 University of Maryland"
 __license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
+__doc_opt__ = """
+Drastic Command Line Interface.
 
+Usage:
+  drastic init --url=<URL> [--username=<USER>] [--password=<PWD>]
+  drastic whoami
+  drastic exit
+  drastic pwd
+  drastic ls [<path>] [-a]
+  drastic cd [<path>]
+  drastic cdmi <path>
+  drastic mkdir <path>
+  drastic put <src> [<dest>] [--mimetype=<MIME>]
+  drastic put --ref <url> <dest> [--mimetype=<MIME>]
+  drastic get <src> [<dest>] [--force]
+  drastic rm <path>
+  drastic chmod <path> (read|write|null) <group>
+  drastic meta add <path> <meta_name> <meta_value>
+  drastic meta set <path> <meta_name> <meta_value>
+  drastic meta rm <path> <meta_name> [<meta_value>]
+  drastic meta ls <path> [<meta_name>]
+  drastic admin lu [<name>]
+  drastic admin lg [<name>]
+  drastic admin mkuser [<name>]
+  drastic admin moduser <name> (email | administrator | active | password) [<value>]
+  drastic admin rmuser [<name>]
+  drastic admin mkgroup [<name>]
+  drastic admin rmgroup [<name>]
+  drastic admin atg <name> <user> ...
+  drastic admin rtg <name> <user> ...
+  drastic (-h | --help)
+  drastic --version
+  drastic mput-prepare [-l label] (--walk <file-list> | --read (<source-dir>|-))
+  drastic mput-execute [-D <debug_level>] [-l label] <tgt-dir-in-repo>
+  drastic mput --walk <source-dir>     <tgt-dir-in-repo>
+  drastic mput --read (<file-list>|-)  <tgt-dir-in-repo>
+  drastic mput-status [-l label] [--reset] [(--clear|--clean)]
+
+Options:
+  -h --help     Show this screen.
+  --version     Show version.
+  --url=<URL>   Location of Indigo server
+  -l --label    a label to have multiple prepares and executes simultaneously  [ default: transfer ]
+  --reset       reset all 'in-progress' entries to 'ready' in the work queue
+  --clear       remove all the entries in the workqueue
+  --clean       remove all the 'DONE' entries in the workqueue
+  -D <debug_level>  trace/debug statements, integer >= 0  [ default: 0 ]
+
+
+Arguments:
+  <tgt-dir-in-repo>    where to place the files when you inject them [ default: / ]
+
+
+
+"""
 
 import errno
 import os
@@ -453,7 +507,7 @@ class DrasticApplication(object):
                             )
                 else:
                     print "  ACL: No ACE defined"
-            
+
             if cdmi_info[u'objectType'] == u'application/cdmi-container':
                 containers = [x
                               for x in cdmi_info[u'children']

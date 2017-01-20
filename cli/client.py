@@ -9,6 +9,8 @@ import mimetypes
 import mmap
 import os
 from base64 import b64encode
+from past.builtins import basestring
+from builtins import str
 try:
     from urllib import pathname2url, url2pathname
 except ImportError:
@@ -631,7 +633,7 @@ class DrasticClient(object):
         from requests_toolbelt.streaming_iterator import StreamingIterator
         if isinstance(data, dict):
             data = json.dumps(data)
-        elif isinstance(data, unicode):
+        elif isinstance(data, str):
             data = data.encode('utf-8')
         elif isinstance(data, StreamingIterator):
             pass

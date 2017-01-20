@@ -2,3 +2,4 @@ blessings
 docopt
 requests
 requests-toolbelt
+future

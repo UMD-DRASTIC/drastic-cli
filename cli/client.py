@@ -8,6 +8,7 @@ import json
 import mimetypes
 import mmap
 import os
+import urllib
 from base64 import b64encode
 from past.builtins import basestring
 from builtins import str
@@ -453,6 +454,7 @@ class DrasticClient(object):
             mypath += '/'
         if isinstance(mypath, str):
             mypath = mypath.encode('utf8')
+        mypath = urllib.quote(mypath)
         url = self.cdmi_url + pathname2url(mypath)
         return url
 

@@ -8,7 +8,7 @@ import json
 import mimetypes
 import mmap
 import os
-import urllib
+import logging
 from base64 import b64encode
 from past.builtins import basestring
 from builtins import str
@@ -474,8 +474,11 @@ class DrasticClient(object):
             headers['Content-type'] = CDMI_CONTAINER
         else:
             headers['Content-type'] = CDMI_OBJECT
-        res = requests.put(req_url, headers=headers, auth=self.auth,
-                           data=data)
+        req = requests.Request('PUT', req_url, headers=headers, auth=self.auth,
+                               data=data)
+        prepared = req.prepare()
+        s = requests.Session()
+        res = s.send(prepared)
         if res.status_code in [400, 401, 403, 404, 406]:
             return Response(res.status_code, res)
         elif res.status_code == 409:
@@ -662,15 +665,33 @@ class DrasticClient(object):
                     'mimetype': mimetype,
                 })
             data = json.dumps(d)
+            if 'size' in metadata and metadata['size'] == 0:
+                logging.warn('Sending Zero Length File:\n{0}'.format(data))
             # Add the metadata parameters into the URL
 #             p = ''.join(["metadata:{0};".format(k)
 #                          for k
 #                          in metadata])
-            #req_url = req_url + '?' + p
+            # req_url = req_url + '?' + p
             return self.put_cdmi(path, data)
         else:
             # PUT the data in non-CDMI to avoid unnecessary base64 overhead
-            #req_url = self.normalize_cdmi_url(path)
+            # req_url = self.normalize_cdmi_url(path)
             self.put_http(path, data, mimetype)
-            #return self.get_cdmi(os.path.split(path)[0])
+            # return self.get_cdmi(os.path.split(path)[0])
             return self.get_cdmi(path)
+
+
+def write_request(req):
+    """
+    Writes a prepared request to a string for logging.
+
+    However pay attention at the formatting used in
+    this function because it is programmed to be pretty
+    printed and may differ from the actual request.
+    """
+    return '{}\n{}\n{}\n\n{}'.format(
+        '-----------START-----------',
+        req.method + ' ' + req.url,
+        '\n'.join('{}: {}'.format(k, v) for k, v in req.headers.items()),
+        req.body,
+    )

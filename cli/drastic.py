@@ -1,6 +1,26 @@
 #!/usr/bin/python
 """Drastic Command Line Interface.
 """
+
+import errno
+import os
+import pickle
+import sys
+from getpass import getpass
+from operator import methodcaller
+import json
+
+import requests
+from requests.exceptions import ConnectionError
+from docopt import docopt
+
+import cli
+from cli.acl import (
+    cdmi_str_to_str_acemask,
+    str_to_cdmi_str_acemask
+)
+from cli.client import DrasticClient
+
 __copyright__ = "Copyright (C) 2016 University of Maryland"
 __license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
 __doc_opt__ = """
@@ -59,40 +79,24 @@ Arguments:
 
 """
 
-import errno
-import os
-import pickle
-import sys
-from getpass import getpass
-from operator import methodcaller
-import json
 
-import requests
-from requests.exceptions import ConnectionError
-from blessings import Terminal
-from docopt import docopt
+SESSION_PATH = os.path.join(os.path.expanduser('~'), '.drastic',  'session.pickle')
 
-import cli
-from cli.acl import (
-    cdmi_str_to_str_acemask,
-    str_to_cdmi_str_acemask
-)
-from cli.client import DrasticClient
 
-SESSION_PATH = os.path.join(os.path.expanduser('~/.drastic'),  'session.pickle'   )
+def unicode(string, foo):
+    return string
 
 
 class DrasticApplication(object):
     """Methods for the CLI"""
 
     def __init__(self, session_path):
-        self.terminal = Terminal()
         self.session_path = session_path
 
     def admin_atg(self, args):
         """Add user(s) to a group."""
         client = self.get_client(args)
-        groupname = unicode(args['<name>'], "utf-8")
+        groupname = str(args['<name>'])
         ls_user = args['<user>']
         res = client.add_user_group(groupname, ls_user)
         if res.ok():
@@ -105,7 +109,7 @@ class DrasticApplication(object):
         """List all groups or a specific group if the name is specified"""
         client = self.get_client(args)
         if args['<name>']:
-            name = unicode(args['<name>'], "utf-8")
+            name = args['<name>']
         else:
             name = None
         if name:
@@ -115,28 +119,28 @@ class DrasticApplication(object):
                 return res.code()
             group_info = res.json()
             members = ", ".join(group_info.get("members", []))
-            print u"{0.bold}Group name{0.normal}: {1}".format(
-                self.terminal,
-                group_info.get("name", name))
-            print u"{0.bold}Group id{0.normal}: {1}".format(
-                self.terminal,
-                group_info.get("uuid", ""))
-            print u"{0.bold}Members{0.normal}: {1}".format(
-                self.terminal,
-                members)
+            print(u"{0.bold}Group name{0.normal}: {1}".format(
+                color,
+                group_info.get("name", name)))
+            print(u"{0.bold}Group id{0.normal}: {1}".format(
+                color,
+                group_info.get("uuid", "")))
+            print(u"{0.bold}Members{0.normal}: {1}".format(
+                color,
+                members))
         else:
             res = client.list_groups()
             if not res.ok():
                 self.print_error(res.msg())
                 return res.code()
             for groupname in res.msg():
-                print groupname
+                print(groupname)
 
     def admin_lu(self, args):
         """List all users or a specific user if the name is specified"""
         client = self.get_client(args)
         if args['<name>']:
-            name = unicode(args['<name>'], "utf-8")
+            name = args['<name>'], "utf-8"
         else:
             name = None
         if name:
@@ -147,31 +151,31 @@ class DrasticApplication(object):
             user_info = res.json()
             groups = u", ".join([el['name']
                                  for el in user_info.get("groups", [])])
-            print u"{0.bold}User name{0.normal}: {1}".format(
-                self.terminal,
-                user_info.get("username", name))
-            print u"{0.bold}Email{0.normal}: {1}".format(
-                self.terminal,
-                user_info.get("email", ""))
-            print u"{0.bold}User id{0.normal}: {1}".format(
-                self.terminal,
-                user_info.get("uuid", ""))
-            print u"{0.bold}Administrator{0.normal}: {1}".format(
-                self.terminal,
-                user_info.get("administrator", False))
-            print u"{0.bold}Active{0.normal}: {1}".format(
-                self.terminal,
-                user_info.get("active", False))
-            print u"{0.bold}Groups{0.normal}: {1}".format(
-                self.terminal,
-                groups)
+            print(u"{0.bold}User name{0.normal}: {1}".format(
+                color,
+                user_info.get("username", name)))
+            print(u"{0.bold}Email{0.normal}: {1}".format(
+                color,
+                user_info.get("email", "")))
+            print(u"{0.bold}User id{0.normal}: {1}".format(
+                color,
+                user_info.get("uuid", "")))
+            print(u"{0.bold}Administrator{0.normal}: {1}".format(
+                color,
+                user_info.get("administrator", False)))
+            print(u"{0.bold}Active{0.normal}: {1}".format(
+                color,
+                user_info.get("active", False)))
+            print(u"{0.bold}Groups{0.normal}: {1}".format(
+                color,
+                groups))
         else:
             res = client.list_users()
             if not res.ok():
                 self.print_error(res.msg())
                 return res.code()
             for username in res.msg():
-                print username
+                print(username)
 
     def admin_mkgroup(self, args):
         """Create a new group. Ask in the terminal for mandatory fields"""
@@ -199,7 +203,6 @@ class DrasticApplication(object):
             username = raw_input("Please enter the user's username: ")
         else:
             username = args['<name>']
-        username = unicode(username, "utf-8")
         res = client.list_user(username)
         if res.ok():
             self.print_error(u"Username {} already exists".format(username))
@@ -225,8 +228,8 @@ class DrasticApplication(object):
         """Moduser a new user. Ask in the terminal if the value isn't
         provided"""
         client = self.get_client(args)
-        value = unicode(args['<value>'], "utf-8")
-        name = unicode(args['<name>'], "utf-8")
+        value = args['<value>']
+        name = args['<name>']
         if not value:
             if args['password']:
                 while not value:
@@ -234,7 +237,7 @@ class DrasticApplication(object):
             else:
                 while not value:
                     value = raw_input("Please enter the new value: ")
-                value = unicode(args['<value>'], "utf-8")
+                value = args['<value>']
         d = {}
         if args['email']:
             d['email'] = value
@@ -258,7 +261,7 @@ class DrasticApplication(object):
             groupname = raw_input("Please enter the group name: ")
         else:
             groupname = args['<name>']
-        groupname = unicode(args['<name>'], "utf-8")
+        groupname = args['<name>']
         res = client.rm_group(groupname)
         if res.ok():
             self.print_success(res.msg())
@@ -273,7 +276,7 @@ class DrasticApplication(object):
             username = raw_input("Please enter the user's username: ")
         else:
             username = args['<name>']
-        username = unicode(username, "utf-8")
+        username = username
         res = client.rm_user(username)
         if res.ok():
             self.print_success(res.msg())
@@ -285,7 +288,7 @@ class DrasticApplication(object):
         """Remove user(s) to a group."""
         client = self.get_client(args)
         groupname = args['<name>']
-        groupname = unicode(args['<name>'], "utf-8")
+        groupname = args['<name>']
         ls_user = args['<user>']
         res = client.rm_user_group(groupname, ls_user)
         if res.ok():
@@ -298,7 +301,7 @@ class DrasticApplication(object):
         "Move into a different container."
         client = self.get_client(args)
         if args['<path>']:
-            path = unicode(args['<path>'], "utf-8")
+            path = args['<path>']
         else:
             path = u"/"
         res = client.chdir(path)
@@ -311,17 +314,17 @@ class DrasticApplication(object):
     def cdmi(self, args):
         "Display cdmi information (dict) for a path."
         client = self.get_client(args)
-        path = unicode(args['<path>'], "utf-8")
+        path = args['<path>']
         res = client.get_cdmi(path)
         if res.ok():
-            print "{} :".format(client.normalize_cdmi_url(path))
+            print("{} :".format(client.normalize_cdmi_url(path)))
             d = res.json()
             for key, value in d.iteritems():
                 if key != "value":
-                    print u"  - {0.bold}{1}{0.normal}: {2}".format(
-                        self.terminal,
+                    print(u"  - {0.bold}{1}{0.normal}: {2}".format(
+                        color,
                         key,
-                        value)
+                        value))
         else:
             self.print_error(res.msg())
 
@@ -336,11 +339,11 @@ class DrasticApplication(object):
             level = "read/write"
         else:
             level = "null"
-        ace = {"acetype" : "ALLOW",
-               "identifier" : group,
+        ace = {"acetype": "ALLOW",
+               "identifier": group,
                "aceflags": "CONTAINER_INHERIT, OBJECT_INHERIT",
-               "acemask" : str_to_cdmi_str_acemask(level, False)}
-        metadata = {"cdmi_acl" : [ace]}
+               "acemask": str_to_cdmi_str_acemask(level, False)}
+        metadata = {"cdmi_acl": [ace]}
         res = client.put(path, metadata=metadata)
         if res.ok():
             self.print_success(res.msg())
@@ -390,9 +393,8 @@ class DrasticApplication(object):
         # Check for overwrite of existing file, directory, link
         if os.path.isfile(localpath):
             if not args['--force']:
-                self.print_error(
-                    u"File '{0}' exists, --force option not used"
-                     "".format(localpath))
+                self.print_error(u"File '{0}' exists, --force option not used"
+                                 "".format(localpath))
                 return errno.EEXIST
         elif os.path.isdir(localpath):
             self.print_error(u"'{0}' is a directory".format(localpath))
@@ -406,17 +408,17 @@ class DrasticApplication(object):
             cfh = client.open(src)
             if cfh.status_code == 404:
                 self.print_error(u"'{0}': No such object or container"
-                                  "".format(src))
+                                 "".format(src))
                 return 404
         except ConnectionError as e:
             self.print_error("'{0}': Redirection failed - Reference isn't accessible"
-                                 "".format(e.request.url, e.strerror))
+                             "".format(e.request.url, e.strerror))
             return 404
         lfh = open(localpath, 'wb')
         for chunk in cfh.iter_content(8192):
             lfh.write(chunk)
         lfh.close()
-        print localpath
+        print(localpath)
 
     def get_client(self, args):
         """Return a DrasticClient.
@@ -459,20 +461,20 @@ class DrasticApplication(object):
 
             res = client.authenticate(username, password)
             if res.ok():
-                print (u"{0.bold_green}Success{0.normal} - {1} as "
-                       "{0.bold}{2}{0.normal}".format(self.terminal,
-                                                      res.msg(),
-                                                      username))
+                print(u"{0.bold_green}Success{0.normal} - {1} as "
+                      "{0.bold}{2}{0.normal}".format(color,
+                                                     res.msg(),
+                                                     username))
             else:
-                print u"{0.bold_red}Failed{0.normal} - {1}".format(
-                    self.terminal,
-                    res.msg())
+                print(u"{0.bold_red}Failed{0.normal} - {1}".format(
+                    color,
+                    res.msg()))
                 # Failed to log in
                 # Exit without saving client
                 return res.code()
         else:
-            print ("{0.bold_green}Connected{0.normal} -"
-                   " Anonymous access".format(self.terminal))
+            print("{0.bold_green}Connected{0.normal} -"
+                  " Anonymous access".format(color))
         # Save the client for future use
         self.save_client(client)
         return 0
@@ -488,25 +490,25 @@ class DrasticApplication(object):
         if res.ok():
             cdmi_info = res.json()
             pwd = client.pwd()
-            if path == None:
+            if path is None:
                 if pwd == "/":
-                    print "Root:"
+                    print("Root:")
                 else:
-                    print u"{}:".format(pwd)
+                    print(u"{}:".format(pwd))
             else:
-                print u"{}{}:".format(pwd, path)
+                print(u"{}{}:".format(pwd, path))
             # Display Acl
             if args['-a']:
                 metadata = cdmi_info.get("metadata", {})
                 cdmi_acl = metadata.get("cdmi_acl", [])
                 if cdmi_acl:
                     for ace in cdmi_acl:
-                        print "  ACL - {}: {}".format(
+                        print("  ACL - {}: {}".format(
                             ace['identifier'],
                             cdmi_str_to_str_acemask(ace['acemask'], False)
-                            )
+                            ))
                 else:
-                    print "  ACL: No ACE defined"
+                    print("  ACL: No ACE defined")
 
             if cdmi_info[u'objectType'] == u'application/cdmi-container':
                 containers = [x
@@ -516,11 +518,11 @@ class DrasticApplication(object):
                            for x in cdmi_info[u'children']
                            if not x.endswith('/')]
                 for child in sorted(containers, key=methodcaller('lower')):
-                    print self.terminal.blue(child)
+                    print(u'{0.blue}{1}{0.normal}'.format(color, child))
                 for child in sorted(objects, key=methodcaller('lower')):
-                    print child
+                    print(child)
             else:
-                print cdmi_info[u'objectName']
+                print(cdmi_info[u'objectName'])
             return 0
         else:
             self.print_error(res.msg())
@@ -586,9 +588,9 @@ class DrasticApplication(object):
                     continue
                 if isinstance(val, list):
                     for v in val:
-                        print u'{0}:{1}'.format(attr, v)
+                        print(u'{0}:{1}'.format(attr, v))
                 else:
-                    print u'{0}:{1}'.format(attr, val)
+                    print(u'{0}:{1}'.format(attr, val))
 
     def meta_rm(self, args):
         """Remove metadata"""
@@ -641,33 +643,33 @@ class DrasticApplication(object):
 
     def mput(self, arguments):
         import mput
-        return mput.mput(self,arguments)
+        return mput.mput(self, arguments)
 
-    def mput_execute(self,arguments):
+    def mput_execute(self, arguments):
         import mput
         return mput.mput_execute(self, arguments)
 
-    def mput_prepare(self,arguments):
+    def mput_prepare(self, arguments):
         import mput
         return mput.mput_prepare(self, arguments)
 
-    def mput_status(self,arguments):
+    def mput_status(self, arguments):
         import mput
         return mput.mput_status(self, arguments)
 
     def print_error(self, msg):
         """Display an error message."""
-        print u"{0.bold_red}Error{0.normal} - {1}".format(self.terminal,
-                                                          msg)
+        print(u"{0.bold_red}Error{0.normal} - {1}".format(color,
+                                                          msg))
 
     def print_success(self, msg):
         """Display a success message."""
-        print u"{0.bold_green}Success{0.normal} - {1}".format(self.terminal,
-                                                              msg)
+        print(u"{0.bold_green}Success{0.normal} - {1}".format(color,
+                                                              msg))
 
     def print_warning(self, msg):
         """Display a warning message."""
-        print u"{0.bold_blue}Warning{0.normal} - {1}".format(self.terminal, msg)
+        print(u"{0.bold_blue}Warning{0.normal} - {1}".format(color, msg))
 
     def put(self, args):
         "Put a file to a path."
@@ -691,7 +693,7 @@ class DrasticApplication(object):
             res = client.put(dest, fh, mimetype=args["--mimetype"])
             if res.ok():
                 cdmi_info = res.json()
-                print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
+                print(cdmi_info[u'parentURI'] + cdmi_info[u'objectName'])
             else:
                 self.print_error(res.msg())
 
@@ -707,14 +709,14 @@ class DrasticApplication(object):
         res = client.put_cdmi(dest, data)
         if res.ok():
             cdmi_info = res.json()
-            print cdmi_info[u'parentURI'] + cdmi_info[u'objectName']
+            print(cdmi_info[u'parentURI'] + cdmi_info[u'objectName'])
         else:
             self.print_error(res.msg())
 
     def pwd(self, args):
         """Print working directory"""
         client = self.get_client(args)
-        print client.pwd()
+        print(client.pwd())
 
     def rm(self, args):
         """Remove a data object or a collection.
@@ -731,8 +733,8 @@ class DrasticApplication(object):
             if not res.ok():
                 # It really does not exist!
                 self.print_error((u"Cannot remove '{0}': "
-                                   "No such object or container)"
-                                   "".format(path)))
+                                  "No such object or container)"
+                                  "".format(path)))
                 return 404
             cdmi_info = res.json()
             # Fixup path and recursively call this function (rm)
@@ -751,7 +753,7 @@ class DrasticApplication(object):
     def whoami(self, args):
         """Print name of the user"""
         client = self.get_client(args)
-        print client.whoami() + " - " + client.url
+        print(client.whoami() + " - " + client.url)
 
 
 def main():
@@ -815,15 +817,52 @@ def main():
         return app.rm(arguments)
     elif arguments['whoami']:
         return app.whoami(arguments)
-    elif arguments['mput-prepare'] :
+    elif arguments['mput-prepare']:
         return app.mput_prepare(arguments)
-    elif arguments['mput-execute'] :
+    elif arguments['mput-execute']:
         return app.mput_execute(arguments)
-    elif arguments['mput-status'] :
+    elif arguments['mput-status']:
         return app.mput_status(arguments)
-    elif arguments['mput'] :
+    elif arguments['mput']:
         return app.mput(arguments)
 
+
+class win_color:
+    purple = ''
+    cyan = ''
+    darkcyan = ''
+    blue = ''
+    green = ''
+    yellow = ''
+    red = ''
+    bold = ''
+    underline = ''
+    bold_green = bold+green
+    bold_red = bold+red
+    bold_blue = bold+blue
+    normal = ''
+
+
+class posix_color:
+    purple = '\033[95m'
+    cyan = '\033[96m'
+    darkcyan = '\033[36m'
+    blue = '\033[94m'
+    green = '\033[92m'
+    yellow = '\033[93m'
+    red = '\033[91m'
+    bold = '\033[1m'
+    underline = '\033[4m'
+    bold_green = '\033[1m\033[92m'
+    bold_red = '\033[1m\033[91m'
+    bold_blue = '\033[1m\033[94m'
+    normal = '\033[0m'
+
+
+if os.name == 'posix':
+    color = posix_color
+else:
+    color = win_color
 
 if __name__ == '__main__':
     main()

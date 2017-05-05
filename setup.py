@@ -1,9 +1,6 @@
 # -*- coding: utf-8 -*-
 """Setup for Drastic CLI.
 """
-__copyright__ = "Copyright (C) 2016 University of Maryland"
-__license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
-
 
 import inspect
 import os
@@ -23,6 +20,10 @@ from setuptools import setup, find_packages
 
 # Import our own module here for version number
 import cli
+
+__copyright__ = "Copyright (C) 2016 University of Maryland"
+__license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
+
 
 # Inspect to find current path
 setuppath = inspect.getfile(inspect.currentframe())
@@ -68,7 +69,7 @@ setup(
     classifiers=[
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: GNU Affero General Public License v3",
-        "Programming Language :: Python :: 2.7",
+        "Programming Language :: Python :: 3.5",
         "Topic :: Internet :: WWW/HTTP :: WSGI",
         "Topic :: Internet :: WWW/HTTP :: WSGI :: Application",
         "Topic :: Internet :: WWW/HTTP :: WSGI :: Middleware",

@@ -1,7 +1,5 @@
 """Drastic CDMI API Client.
 """
-__copyright__ = "Copyright (C) 2016 University of Maryland"
-__license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
 
 
 import json
@@ -10,8 +8,6 @@ import mmap
 import os
 import logging
 from base64 import b64encode
-from past.builtins import basestring
-from builtins import str
 try:
     from urllib import pathname2url, url2pathname
 except ImportError:
@@ -21,6 +17,9 @@ import requests
 
 import cli
 
+
+__copyright__ = "Copyright (C) 2016 University of Maryland"
+__license__ = "GNU AFFERO GENERAL PUBLIC LICENSE, Version 3"
 CDMI_CONTAINER = 'application/cdmi-container'
 CDMI_OBJECT = 'application/cdmi-object'
 
@@ -433,7 +432,7 @@ class DrasticClient(object):
         # Turn URL path into OS path for manipulation
         mypath = url2pathname(path)
         if not os.path.isabs(mypath):
-            mypath = "/" + mypath
+            mypath = '/' + mypath
         url = self.admin_url + mypath
         return url
 
@@ -450,10 +449,10 @@ class DrasticClient(object):
             mypath = os.path.join(url2pathname(self.pwd()), mypath)
         # normalize path
         mypath = os.path.normpath(mypath)
-        if path.endswith('/') and not mypath.endswith('/'):
-            mypath += '/'
-        if isinstance(mypath, str):
-            mypath = mypath.encode('utf8')
+        if path.endswith(os.path.sep) and not mypath.endswith(os.path.sep):
+            mypath += os.path.sep
+        # if isinstance(mypath, str):
+        #    mypath = mypath.encode('utf8')
         url = self.cdmi_url + pathname2url(mypath)
         return url
 
@@ -636,14 +635,9 @@ class DrasticClient(object):
                 else:
                     mimetype = type_
         # Deal with varying data type
-        from requests_toolbelt.streaming_iterator import StreamingIterator
         if isinstance(data, dict):
             data = json.dumps(data)
-        elif isinstance(data, str):
-            data = data.encode('utf-8')
-        elif isinstance(data, StreamingIterator):
-            pass
-        elif not isinstance(data, (mmap.mmap, basestring)):
+        elif not isinstance(data, (mmap.mmap, str)):
             # Read the file-like object as a memory mapped string. Looks like
             # a string, but accesses the file directly. This avoids reading
             # large files into memory

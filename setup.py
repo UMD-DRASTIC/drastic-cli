@@ -50,6 +50,10 @@ with open(os.path.join(setupdir, 'requirements.txt'), 'r') as fh:
 
 
 setup(
+    app=['cli/drastic.py'],
+    data_files=[],
+    options={'py2app': {}},
+
     name='drastic-cli',
     version=cli.__version__,
     description='Drastic Command Line Interface',

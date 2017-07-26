@@ -30,7 +30,7 @@ setuppath = inspect.getfile(inspect.currentframe())
 setupdir = os.path.dirname(setuppath)
 
 # Find longer description from README
-with open(os.path.join(setupdir, 'README.rst'), 'r') as fh:
+with open(os.path.join(setupdir, 'README.md'), 'r') as fh:
     _long_description = fh.read()
 
 # Requirements

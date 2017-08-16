@@ -321,7 +321,8 @@ class DrasticApplication(object):
         if res.ok():
             print("{} :".format(client.normalize_cdmi_url(path)))
             d = res.json()
-            for key, value in d.iteritems():
+            print(json.dumps(d))
+            for key, value in d.items():
                 if key != "value":
                     print(u"  - {0.bold}{1}{0.normal}: {2}".format(
                         color,
@@ -583,7 +584,7 @@ class DrasticApplication(object):
                     cdmi_info['metadata'][meta_name]))
         else:
             # List everything
-            for attr, val in cdmi_info['metadata'].iteritems():
+            for attr, val in cdmi_info['metadata'].items():
                 if attr.startswith(('cdmi_',
                                     'com.archiveanalytics.drastic_')):
                     # Ignore non-user defined metadata

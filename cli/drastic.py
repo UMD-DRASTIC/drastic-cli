@@ -6,6 +6,7 @@ import errno
 import os
 import pickle
 import sys
+import logging
 from getpass import getpass
 from operator import methodcaller
 import json
@@ -27,6 +28,8 @@ __doc_opt__ = """
 Drastic Command Line Interface.
 
 Usage:
+  drastic (-h | --help)
+  drastic --version
   drastic init --url=<URL> [--username=<USER>] [--password=<PWD>]
   drastic whoami
   drastic exit
@@ -53,8 +56,6 @@ Usage:
   drastic admin rmgroup [<name>]
   drastic admin atg <name> <user> ...
   drastic admin rtg <name> <user> ...
-  drastic (-h | --help)
-  drastic --version
   drastic mput-prepare [-l label] (--walk <file-list> | --read (<source-dir>|-))
   drastic mput-execute [-D <debug_level>] [-l label] <tgt-dir-in-repo>
   drastic mput --walk <source-dir>     <tgt-dir-in-repo>
@@ -70,6 +71,7 @@ Options:
   --clear       remove all the entries in the workqueue
   --clean       remove all the 'DONE' entries in the workqueue
   -D <debug_level>  trace/debug statements, integer >= 0  [ default: 0 ]
+  --debug       show debug output on the command-line
 
 
 Arguments:
@@ -761,6 +763,12 @@ def main():
     arguments = docopt(__doc_opt__,
                        version='Drastic CLI {}'.format(cli.__version__))
     app = DrasticApplication(SESSION_PATH)
+
+    # Set up console log levels (default=warn, quiet=error, debug=debug)
+    log_level = logging.WARN
+    if arguments.get('--debug'):  # debug overrides quiet
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level)
 
     if arguments['init']:
         return app.init(arguments)

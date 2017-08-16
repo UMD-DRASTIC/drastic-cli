@@ -267,7 +267,7 @@ class DrasticClient(object):
             headers['Accept'] = CDMI_CONTAINER
         else:
             headers['Accept'] = CDMI_OBJECT
-        res = requests.get(req_url, headers=headers, auth=self.auth, allow_redirects=False)
+        res = requests.get(req_url, headers=headers, auth=self.auth, allow_redirects=True)
         if res.status_code in [400, 401, 403]:
             return Response(res.status_code,
                             res.content)
@@ -287,6 +287,8 @@ class DrasticClient(object):
         try:
             return Response(0, res.json())
         except ValueError:
+            logging.debug("Drastic returned an invalid response for GET CDMI: \n{0}"
+                          .format(res.content))
             # The API does not appear to return valid JSON
             # It is probably not a CDMI API - this will be a problem!
             return Response(500, "Invalid response format")

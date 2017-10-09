@@ -656,7 +656,7 @@ class DrasticClient(object):
             d = {'metadata': metadata}
             if data:
                 d.update({
-                    'value': b64encode(data),
+                    'value': b64encode(data).decode('ascii'),
                     'valuetransferencoding': "base64",
                     'mimetype': mimetype,
                 })

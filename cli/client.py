@@ -470,7 +470,7 @@ class DrasticClient(object):
         req_url = self.normalize_cdmi_url(path)
         headers = {'user-agent': self.u_agent,
                    'X-CDMI-Specification-Version': "1.1",
-                   'Accept': 'application/json'}
+                   'Accept': ','.join([CDMI_CONTAINER, CDMI_OBJECT, 'application/json'])}
         if path.endswith('/'):
             headers['Content-type'] = CDMI_CONTAINER
         else:
@@ -500,7 +500,7 @@ class DrasticClient(object):
         req_url = self.normalize_cdmi_url(path)
         headers = {'user-agent': self.u_agent,
                    'Content-type': content_type,
-                   'Accept': 'application/json'}
+                   'Accept': ','.join([CDMI_CONTAINER, CDMI_OBJECT, 'application/json'])}
         res = requests.put(req_url, headers=headers, auth=self.auth,
                            data=data)
         if res.status_code in [400, 401, 403, 404, 406]:

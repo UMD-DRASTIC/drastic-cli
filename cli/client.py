@@ -467,14 +467,17 @@ class DrasticClient(object):
         :rtype: dict
 
         """
+        logging.debug("DrasticClient.put_cdmi called: \n{0}"
+                      .format(path))
         req_url = self.normalize_cdmi_url(path)
         headers = {'user-agent': self.u_agent,
-                   'X-CDMI-Specification-Version': "1.1",
-                   'Accept': ','.join([CDMI_CONTAINER, CDMI_OBJECT, 'application/json'])}
+                   'X-CDMI-Specification-Version': "1.1"}
         if path.endswith('/'):
             headers['Content-type'] = CDMI_CONTAINER
+            headers['Accept'] = CDMI_CONTAINER
         else:
             headers['Content-type'] = CDMI_OBJECT
+            headers['Accept'] = CDMI_OBJECT
         req = requests.Request('PUT', req_url, headers=headers, auth=self.auth,
                                data=data)
         prepared = req.prepare()
@@ -497,6 +500,8 @@ class DrasticClient(object):
         :rtype: str
 
         """
+        logging.debug("DrasticClient.put_http called: \n{0} {1}"
+                      .format(path, content_type))
         req_url = self.normalize_cdmi_url(path)
         headers = {'user-agent': self.u_agent,
                    'Content-type': content_type,
@@ -620,6 +625,8 @@ class DrasticClient(object):
         :rtype: dict
 
         """
+        logging.debug("DrasticClient.put called: \n{0}"
+                      .format(path))
         # Deal with missing mimetype
         if not mimetype:
             type_, enc_ = mimetypes.guess_type(path)
